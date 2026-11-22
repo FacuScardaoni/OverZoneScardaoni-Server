@@ -12,16 +12,16 @@ package com.OverZone.Scardaoni.shared;
  * Valores del juego que necesitan conocer tanto el servidor como el cliente.
  *
  * El servidor los usa para las reglas (tamaño para los choques, vida máxima)
- * y el cliente para dibujar (tamaño de los sprites, barra de vida, mínimo de
- * jugadores que muestra la sala de espera).
+ * y el cliente para dibujar (tamaño de los sprites, mínimo de jugadores que
+ * muestra la sala de espera). Los valores propios de cada personaje están en
+ * CharacterType.
  */
 public final class GameConstants {
 
     /** Lado del cuadrado que ocupa un jugador, en unidades del mapa. */
     public static final float PLAYER_SIZE = 24f;
-    public static final float PLAYER_MAX_HEALTH = 100f;
-    /** Lado del cuadrado que ocupa un proyectil. */
-    public static final float PROJECTILE_SIZE = 8f;
+    /** Tamaño con que se dibuja el sprite de un jugador (más grande que su área de choque). */
+    public static final float PLAYER_DRAW_SIZE = 32f;
     /** Jugadores necesarios para empezar una partida. */
     public static final int MIN_PLAYERS = 2;
 

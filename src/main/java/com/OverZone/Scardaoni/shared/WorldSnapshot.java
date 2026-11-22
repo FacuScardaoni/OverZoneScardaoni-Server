@@ -35,57 +35,64 @@ public class WorldSnapshot {
         public final int id;
         public final String name;
         public final int team;
+        /** Personaje elegido (CharacterType.id()). */
+        public final int character;
         public final float x, y;
         public final int facing;
         public final boolean moving;
         public final boolean alive;
         public final float health;
-        public final boolean dashing;
+        /** Habilidad en uso: Impulso (Volt) o Escudo (Brutus). */
+        public final boolean abilityActive;
+        /** Hacia dónde apunta el escudo, en grados (0 = derecha, 90 = arriba). */
+        public final float shieldAngle;
         public final boolean invulnerable;
         public final boolean ready;
         public final int kills, deaths;
         /** 0 = habilidad lista, 1 = recién usada. */
-        public final float dashCooldown;
+        public final float abilityCooldown;
         public final float respawnIn;
 
-        public PlayerState(int id, String name, int team, float x, float y, int facing,
-                           boolean moving, boolean alive, float health, boolean dashing,
-                           boolean invulnerable, boolean ready, int kills, int deaths,
-                           float dashCooldown, float respawnIn) {
+        public PlayerState(int id, String name, int team, int character, float x, float y, int facing,
+                           boolean moving, boolean alive, float health, boolean abilityActive,
+                           float shieldAngle, boolean invulnerable, boolean ready, int kills, int deaths,
+                           float abilityCooldown, float respawnIn) {
             this.id = id;
             this.name = name;
             this.team = team;
+            this.character = character;
             this.x = x;
             this.y = y;
             this.facing = facing;
             this.moving = moving;
             this.alive = alive;
             this.health = health;
-            this.dashing = dashing;
+            this.abilityActive = abilityActive;
+            this.shieldAngle = shieldAngle;
             this.invulnerable = invulnerable;
             this.ready = ready;
             this.kills = kills;
             this.deaths = deaths;
-            this.dashCooldown = dashCooldown;
+            this.abilityCooldown = abilityCooldown;
             this.respawnIn = respawnIn;
         }
 
         String encode() {
-            return id + "," + name + "," + team + "," + Protocol.f(x) + "," + Protocol.f(y) + ","
+            return id + "," + name + "," + team + "," + character + "," + Protocol.f(x) + "," + Protocol.f(y) + ","
                 + facing + "," + b(moving) + "," + b(alive) + "," + Protocol.f(health) + ","
-                + b(dashing) + "," + b(invulnerable) + "," + b(ready) + "," + kills + "," + deaths + ","
-                + Protocol.f(dashCooldown) + "," + Protocol.f(respawnIn);
+                + b(abilityActive) + "," + Math.round(shieldAngle) + "," + b(invulnerable) + "," + b(ready) + ","
+                + kills + "," + deaths + "," + Protocol.f(abilityCooldown) + "," + Protocol.f(respawnIn);
         }
 
         static PlayerState decode(String s) {
             String[] f = s.split(",");
             return new PlayerState(
-                Integer.parseInt(f[0]), f[1], Integer.parseInt(f[2]),
-                Float.parseFloat(f[3]), Float.parseFloat(f[4]), Integer.parseInt(f[5]),
-                bool(f[6]), bool(f[7]), Float.parseFloat(f[8]),
-                bool(f[9]), bool(f[10]), bool(f[11]),
-                Integer.parseInt(f[12]), Integer.parseInt(f[13]),
-                Float.parseFloat(f[14]), Float.parseFloat(f[15]));
+                Integer.parseInt(f[0]), f[1], Integer.parseInt(f[2]), Integer.parseInt(f[3]),
+                Float.parseFloat(f[4]), Float.parseFloat(f[5]), Integer.parseInt(f[6]),
+                bool(f[7]), bool(f[8]), Float.parseFloat(f[9]),
+                bool(f[10]), Float.parseFloat(f[11]), bool(f[12]), bool(f[13]),
+                Integer.parseInt(f[14]), Integer.parseInt(f[15]),
+                Float.parseFloat(f[16]), Float.parseFloat(f[17]));
         }
     }
 
@@ -93,23 +100,26 @@ public class WorldSnapshot {
     public static class ProjectileState {
         public final int id;
         public final int team;
+        /** Personaje que lo disparó (define su tamaño y su aspecto). */
+        public final int character;
         public final float x, y;
 
-        public ProjectileState(int id, int team, float x, float y) {
+        public ProjectileState(int id, int team, int character, float x, float y) {
             this.id = id;
             this.team = team;
+            this.character = character;
             this.x = x;
             this.y = y;
         }
 
         String encode() {
-            return id + "," + team + "," + Protocol.f(x) + "," + Protocol.f(y);
+            return id + "," + team + "," + character + "," + Protocol.f(x) + "," + Protocol.f(y);
         }
 
         static ProjectileState decode(String s) {
             String[] f = s.split(",");
             return new ProjectileState(Integer.parseInt(f[0]), Integer.parseInt(f[1]),
-                Float.parseFloat(f[2]), Float.parseFloat(f[3]));
+                Integer.parseInt(f[2]), Float.parseFloat(f[3]), Float.parseFloat(f[4]));
         }
     }
 

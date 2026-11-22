@@ -1,31 +1,30 @@
 package com.OverZone.Scardaoni.server.game;
 
-import com.OverZone.Scardaoni.shared.GameConstants;
+import com.OverZone.Scardaoni.shared.CharacterType;
 import com.badlogic.gdx.math.Rectangle;
 
 /**
  * Proyectil. Lo crea y lo mueve el servidor.
  *
- * Recuerda quién lo disparó (ownerId) y de qué equipo es (team): solo puede
- * dañar a jugadores del equipo contrario.
+ * Recuerda quién lo disparó, de qué equipo es (solo daña al equipo contrario)
+ * y con qué personaje: de eso dependen su velocidad, su tamaño y su daño.
  */
 public class Projectile {
-
-    public static final float SIZE = GameConstants.PROJECTILE_SIZE;
-    public static final float SPEED = 320f;
-    public static final float DAMAGE = 25f;
 
     private final int id;
     private final int ownerId;
     private final int team;
+    private final CharacterType character;
     private float x, y;
     private final float dirX, dirY;
     private boolean alive = true;
 
-    public Projectile(int id, int ownerId, int team, float x, float y, float dirX, float dirY) {
+    public Projectile(int id, int ownerId, int team, CharacterType character,
+                      float x, float y, float dirX, float dirY) {
         this.id = id;
         this.ownerId = ownerId;
         this.team = team;
+        this.character = character;
         this.x = x;
         this.y = y;
         float len = (float) Math.sqrt(dirX * dirX + dirY * dirY);
@@ -41,14 +40,19 @@ public class Projectile {
     }
 
     public void update(float delta) {
-        x += dirX * SPEED * delta;
-        y += dirY * SPEED * delta;
+        x += dirX * character.projectileSpeed * delta;
+        y += dirY * character.projectileSpeed * delta;
     }
 
     public Rectangle getBounds() {
-        return new Rectangle(x - SIZE / 2f, y - SIZE / 2f, SIZE, SIZE);
+        float size = character.projectileSize;
+        return new Rectangle(x - size / 2f, y - size / 2f, size, size);
     }
 
+    public float getDamage() { return character.damage; }
+    public CharacterType getCharacter() { return character; }
+    public float getDirX() { return dirX; }
+    public float getDirY() { return dirY; }
     public int getId() { return id; }
     public int getOwnerId() { return ownerId; }
     public int getTeam() { return team; }

@@ -62,12 +62,13 @@ src/main/java/com/OverZone/Scardaoni/
 │   ├── ConnectedClient    dirección y jugador de cada cliente
 │   └── game/              La partida real (solo existe en el servidor)
 │       ├── MatchSimulation    reglas, etapas, equipos, colisiones, puntaje
-│       ├── Player             jugador: vida, impulso, muerte y reaparición
+│       ├── Player             jugador: vida, habilidad (impulso o escudo), muerte y reaparición
 │       └── Projectile         proyectil
 └── shared/            COMPARTIDO con el cliente (copia idéntica)
     ├── Protocol           mensajes, puerto, tiempos y versión del protocolo
     ├── PlayerInput        entradas que envía el cliente
     ├── WorldSnapshot      estado de la partida que envía el servidor
+    ├── CharacterType      estadísticas de Volt y Brutus
     ├── MatchPhase, Team, Direction, GameConstants
     └── Arena, Obstacle    el mapa
 ```

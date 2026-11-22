@@ -1,6 +1,7 @@
 package com.OverZone.Scardaoni.server.game;
 
 import com.OverZone.Scardaoni.shared.Direction;
+import com.OverZone.Scardaoni.shared.CharacterType;
 import com.OverZone.Scardaoni.shared.GameConstants;
 import com.OverZone.Scardaoni.shared.MatchPhase;
 import com.OverZone.Scardaoni.shared.Team;
@@ -30,7 +31,6 @@ public class MatchSimulation {
     public static final float MATCH_DURATION = 120f;
     public static final float COUNTDOWN_DURATION = 3f;
     public static final float RESULTS_DURATION = 8f;
-    public static final float FIRE_COOLDOWN = 0.22f;
     public static final int MIN_PLAYERS = GameConstants.MIN_PLAYERS;
     /** Si no llegan entradas de un jugador en este tiempo, se queda quieto y deja de disparar. */
     public static final float INPUT_STALE_TIME = 0.25f;
@@ -122,6 +122,18 @@ public class MatchSimulation {
     public void setReady(int playerId, boolean ready) {
         Slot slot = findSlot(playerId);
         if (slot != null) slot.ready = ready;
+    }
+
+    /**
+     * Cambia el personaje de un jugador. Solo se permite en la sala de
+     * espera: durante la partida, el pedido se ignora.
+     */
+    public void setCharacter(int playerId, CharacterType character) {
+        if (phase != MatchPhase.LOBBY && phase != MatchPhase.COUNTDOWN) return;
+        Slot slot = findSlot(playerId);
+        if (slot != null && slot.player.getCharacter() != character) {
+            slot.player.setCharacter(character);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -242,11 +254,19 @@ public class MatchSimulation {
         // Habilidad: hubo un pedido nuevo si el contador creció.
         if (in.abilityCount != s.lastAbilityCount) {
             s.lastAbilityCount = in.abilityCount;
-            if (!player.isDashing()) {
+            if (player.getCharacter() == CharacterType.VOLT) {
+                // Impulso: hacia donde camina o, si está quieto, hacia el mouse.
                 float dashX = pressingMovementKeys ? in.moveX : aimDx;
                 float dashY = pressingMovementKeys ? in.moveY : aimDy;
-                player.tryStartDash(dashX, dashY);
+                player.tryUseAbility(dashX, dashY);
+            } else {
+                // Escudo: hacia donde apunta el mouse.
+                player.tryUseAbility(aimDx, aimDy);
             }
+        }
+        // Mientras el escudo está activo, sigue la dirección del mouse.
+        if (player.isShieldActive()) {
+            player.setShieldDirection(aimDx, aimDy);
         }
 
         float speed = player.getCurrentSpeed();
@@ -301,8 +321,8 @@ public class MatchSimulation {
             dirY = facing.y;
         }
         projectiles.add(new Projectile(nextProjectileId++, player.getId(), player.getTeam(),
-            player.getX(), player.getY(), dirX, dirY));
-        s.fireCooldown = FIRE_COOLDOWN;
+            player.getCharacter(), player.getX(), player.getY(), dirX, dirY));
+        s.fireCooldown = player.getCharacter().fireCooldown;
     }
 
     private void updateProjectiles(float delta) {
@@ -330,7 +350,7 @@ public class MatchSimulation {
                 if (!target.isAlive() || target.getTeam() == p.getTeam()) continue;
                 if (!target.getBounds().overlaps(bounds)) continue;
 
-                boolean eliminated = target.takeDamage(Projectile.DAMAGE);
+                boolean eliminated = target.takeDamage(p.getDamage(), p.getDirX(), p.getDirY());
                 if (eliminated) {
                     Slot shooter = findSlot(p.getOwnerId());
                     if (shooter != null) shooter.player.addKill();
@@ -404,14 +424,15 @@ public class MatchSimulation {
         for (Slot s : slots) {
             Player p = s.player;
             ps.add(new WorldSnapshot.PlayerState(
-                p.getId(), p.getName(), p.getTeam(), p.getX(), p.getY(),
+                p.getId(), p.getName(), p.getTeam(), p.getCharacter().id(), p.getX(), p.getY(),
                 p.getFacingDirection(), p.isMoving(), p.isAlive(), p.getHealth(),
-                p.isDashing(), p.isInvulnerable(), s.ready, p.getKills(), p.getDeaths(),
-                p.getDashCooldownProgress(), p.getRespawnRemaining()));
+                p.isAbilityActive(), p.getShieldAngle(), p.isInvulnerable(), s.ready,
+                p.getKills(), p.getDeaths(), p.getAbilityCooldownProgress(), p.getRespawnRemaining()));
         }
         List<WorldSnapshot.ProjectileState> prs = new ArrayList<>();
         for (Projectile p : projectiles) {
-            prs.add(new WorldSnapshot.ProjectileState(p.getId(), p.getTeam(), p.getX(), p.getY()));
+            prs.add(new WorldSnapshot.ProjectileState(p.getId(), p.getTeam(), p.getCharacter().id(),
+                p.getX(), p.getY()));
         }
         return new WorldSnapshot(seq, phase, Math.max(0f, phaseTimer), scoreBlue, scoreRed,
             winner, endReason, ps, prs, 0L);

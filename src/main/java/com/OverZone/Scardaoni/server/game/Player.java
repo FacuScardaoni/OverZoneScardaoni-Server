@@ -1,27 +1,23 @@
 package com.OverZone.Scardaoni.server.game;
 
+import com.OverZone.Scardaoni.shared.CharacterType;
 import com.OverZone.Scardaoni.shared.Direction;
 import com.OverZone.Scardaoni.shared.GameConstants;
 import com.badlogic.gdx.math.Rectangle;
 
 /**
- * Jugador de la partida (personaje Volt).
+ * Jugador de la partida. Solo existe en el SERVIDOR.
  *
- * Esta clase la usa el SERVIDOR: guarda el estado real del jugador y aplica
- * sus reglas (daño, muerte, reaparición, impulso). Los clientes nunca la
- * modifican: solo reciben una copia de sus datos dentro del estado de la
- * partida que envía el servidor.
+ * Guarda el estado real del jugador y aplica sus reglas: daño, muerte,
+ * reaparición y la habilidad de su personaje. Las estadísticas (vida,
+ * velocidad, daño, habilidad) salen de su CharacterType, así el mismo código
+ * sirve para Volt y para Brutus.
  */
 public class Player {
 
     public static final float SIZE = GameConstants.PLAYER_SIZE;
-    public static final float SPEED = 140f; // unidades/seg
-    public static final float MAX_HEALTH = GameConstants.PLAYER_MAX_HEALTH;
 
     public static final float DASH_SPEED_MULTIPLIER = 3.2f;
-    public static final float DASH_DURATION = 0.18f;
-    public static final float DASH_COOLDOWN = 3.0f;
-
     public static final float HIT_INVULNERABILITY = 0.4f;
     public static final float SPAWN_INVULNERABILITY = 1.5f;
     public static final float RESPAWN_DELAY = 3.0f;
@@ -29,18 +25,24 @@ public class Player {
     private final int id;
     private final String name;
     private int team;
+    private CharacterType character = CharacterType.VOLT;
 
     private float x, y;
-    private float health = MAX_HEALTH;
+    private float health;
     private boolean alive = true;
     private float respawnRemaining = 0f;
 
     private int facingDirection = Direction.DOWN;
     private boolean moving = false;
 
-    private float dashTimeRemaining = 0f;
-    private float dashCooldownRemaining = 0f;
+    /** Tiempo que le queda a la habilidad activa (impulso o escudo). */
+    private float abilityTimeRemaining = 0f;
+    private float abilityCooldownRemaining = 0f;
+
+    // Impulso Over (Volt)
     private float dashDirX, dashDirY;
+    // Escudo Cinético (Brutus): hacia dónde apunta, con largo 1
+    private float shieldDirX = 0f, shieldDirY = -1f;
 
     private float invulnerableTimeRemaining = 0f;
 
@@ -53,6 +55,7 @@ public class Player {
         this.team = team;
         this.x = x;
         this.y = y;
+        this.health = character.maxHealth;
     }
 
     public Rectangle getBounds() {
@@ -65,46 +68,96 @@ public class Player {
             respawnRemaining -= delta;
             return;
         }
-        if (dashTimeRemaining > 0) dashTimeRemaining -= delta;
-        if (dashCooldownRemaining > 0) dashCooldownRemaining -= delta;
+        if (abilityTimeRemaining > 0) abilityTimeRemaining -= delta;
+        if (abilityCooldownRemaining > 0) abilityCooldownRemaining -= delta;
         if (invulnerableTimeRemaining > 0) invulnerableTimeRemaining -= delta;
     }
 
-    public void tryStartDash(float dirX, float dirY) {
-        if (!alive) return;
-        if (dashCooldownRemaining <= 0f && (dirX != 0 || dirY != 0)) {
-            dashTimeRemaining = DASH_DURATION;
-            dashCooldownRemaining = DASH_COOLDOWN;
-            float len = (float) Math.sqrt(dirX * dirX + dirY * dirY);
+    // ------------------------------------------------------------------
+    // Habilidades
+    // ------------------------------------------------------------------
+
+    /**
+     * Intenta usar la habilidad del personaje en la dirección indicada.
+     * Devuelve true si se activó (no estaba recargando).
+     */
+    public boolean tryUseAbility(float dirX, float dirY) {
+        if (!alive || abilityCooldownRemaining > 0f || isAbilityActive()) return false;
+        float len = (float) Math.sqrt(dirX * dirX + dirY * dirY);
+        if (len == 0) return false;
+
+        abilityTimeRemaining = character.abilityDuration;
+        abilityCooldownRemaining = character.abilityCooldown;
+        if (character == CharacterType.VOLT) {
             dashDirX = dirX / len;
             dashDirY = dirY / len;
+        } else {
+            setShieldDirection(dirX, dirY);
         }
+        return true;
+    }
+
+    public boolean isAbilityActive() {
+        return abilityTimeRemaining > 0f;
     }
 
     public boolean isDashing() {
-        return dashTimeRemaining > 0f;
+        return character == CharacterType.VOLT && isAbilityActive();
+    }
+
+    public boolean isShieldActive() {
+        return character == CharacterType.BRUTUS && isAbilityActive();
+    }
+
+    /** El escudo sigue hacia donde apunta Brutus mientras está activo. */
+    public void setShieldDirection(float dirX, float dirY) {
+        float len = (float) Math.sqrt(dirX * dirX + dirY * dirY);
+        if (len == 0) return;
+        shieldDirX = dirX / len;
+        shieldDirY = dirY / len;
+    }
+
+    /** Ángulo del escudo en grados (0 = derecha, 90 = arriba). */
+    public float getShieldAngle() {
+        return (float) Math.toDegrees(Math.atan2(shieldDirY, shieldDirX));
     }
 
     public float getCurrentSpeed() {
-        return isDashing() ? SPEED * DASH_SPEED_MULTIPLIER : SPEED;
+        return isDashing() ? character.speed * DASH_SPEED_MULTIPLIER : character.speed;
     }
 
     public float getDashDirX() { return dashDirX; }
     public float getDashDirY() { return dashDirY; }
 
+    // ------------------------------------------------------------------
+    // Daño
+    // ------------------------------------------------------------------
+
     /**
-     * Aplica daño. Devuelve true si este golpe eliminó al jugador, para que
-     * quien lo llama pueda sumar el punto al equipo contrario.
+     * Aplica daño de un proyectil que viaja en la dirección (projDirX, projDirY).
+     * Si Brutus tiene el escudo activo y el disparo viene de frente, el escudo
+     * absorbe parte del daño. Devuelve true si este golpe eliminó al jugador.
      */
-    public boolean takeDamage(float amount) {
+    public boolean takeDamage(float amount, float projDirX, float projDirY) {
         if (!alive || invulnerableTimeRemaining > 0) return false;
+
+        if (isShieldActive()) {
+            // El proyectil viene "de frente" si viaja en sentido contrario a
+            // donde apunta el escudo. El producto escalar entre las dos
+            // direcciones es -1 si son opuestas y +1 si van para el mismo lado.
+            float dot = projDirX * shieldDirX + projDirY * shieldDirY;
+            if (dot <= -CharacterType.SHIELD_FRONT_COS) {
+                amount *= (1f - CharacterType.SHIELD_ABSORB);
+            }
+        }
+
         health -= amount;
         invulnerableTimeRemaining = HIT_INVULNERABILITY;
         if (health <= 0) {
             health = 0;
             alive = false;
             moving = false;
-            dashTimeRemaining = 0;
+            abilityTimeRemaining = 0;
             respawnRemaining = RESPAWN_DELAY;
             deaths++;
             return true;
@@ -120,11 +173,11 @@ public class Player {
     public void respawn(float newX, float newY) {
         x = newX;
         y = newY;
-        health = MAX_HEALTH;
+        health = character.maxHealth;
         alive = true;
         respawnRemaining = 0f;
-        dashTimeRemaining = 0f;
-        dashCooldownRemaining = 0f;
+        abilityTimeRemaining = 0f;
+        abilityCooldownRemaining = 0f;
         invulnerableTimeRemaining = SPAWN_INVULNERABILITY;
     }
 
@@ -140,12 +193,20 @@ public class Player {
     public boolean isAlive() { return alive; }
     public boolean isInvulnerable() { return invulnerableTimeRemaining > 0f; }
 
-    public float getDashCooldownProgress() {
-        // 0 = listo para usar, 1 = recién usado
-        return Math.max(0f, dashCooldownRemaining / DASH_COOLDOWN);
+    public float getAbilityCooldownProgress() {
+        // 0 = lista para usar, 1 = recién usada
+        return Math.max(0f, abilityCooldownRemaining / character.abilityCooldown);
     }
 
     public float getRespawnRemaining() { return Math.max(0f, respawnRemaining); }
+
+    public CharacterType getCharacter() { return character; }
+
+    /** Solo se usa en la sala de espera. Cambia el personaje y repone la vida. */
+    public void setCharacter(CharacterType character) {
+        this.character = character;
+        this.health = character.maxHealth;
+    }
 
     public int getId() { return id; }
     public String getName() { return name; }

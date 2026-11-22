@@ -3,6 +3,7 @@ package com.OverZone.Scardaoni.server;
 import com.OverZone.Scardaoni.server.game.Player;
 import com.OverZone.Scardaoni.shared.MatchPhase;
 import com.OverZone.Scardaoni.server.game.MatchSimulation;
+import com.OverZone.Scardaoni.shared.CharacterType;
 import com.OverZone.Scardaoni.shared.PlayerInput;
 import com.OverZone.Scardaoni.shared.Protocol;
 
@@ -343,8 +344,9 @@ public class GameServer {
                 break;
             case Protocol.PING:
                 match.setReady(client.playerId, "1".equals(parts[1]));
+                match.setCharacter(client.playerId, CharacterType.fromId(Integer.parseInt(parts[2])));
                 // Se devuelve la misma marca de tiempo: el cliente calcula el retardo.
-                send(Protocol.join(Protocol.PONG, parts[2]), in.address, in.port);
+                send(Protocol.join(Protocol.PONG, parts[3]), in.address, in.port);
                 break;
             case Protocol.DISCONNECT:
                 removeClient(client, "se desconecto");
