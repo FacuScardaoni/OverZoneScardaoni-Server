@@ -291,6 +291,19 @@ public class GameServer {
         }
     }
 
+    /** Muestra en la consola los pedidos de modo rechazados, para entender qué pasó. */
+    private void logModeRequest(ConnectedClient client, GameMode requested, MatchSimulation.ModeRequestResult result) {
+        String why;
+        switch (result) {
+            case NOT_HOST: why = "no es el anfitrion"; break;
+            case NOT_ENOUGH_PLAYERS: why = "hacen falta " + requested.requiredPlayers + " jugadores"; break;
+            case MATCH_STARTED: why = "la partida ya empezo"; break;
+            default: return; // aceptado (el cambio ya se muestra), repetido o ya elegido
+        }
+        System.out.println("Pedido de modo " + requested.displayName + " de " + client.name
+            + " rechazado: " + why);
+    }
+
     private void handleMessage(Incoming in) {
         String[] parts = in.text.split(";", -1);
         String type = parts[0];
@@ -350,10 +363,13 @@ public class GameServer {
             case Protocol.PING:
                 match.setReady(client.playerId, "1".equals(parts[1]));
                 match.setCharacter(client.playerId, CharacterType.fromId(Integer.parseInt(parts[2])));
-                // Solo el anfitrión puede cambiar el modo; la simulación lo valida.
-                match.requestMode(client.playerId, GameMode.fromId(Integer.parseInt(parts[3])));
+                // Pedido de modo numerado: la simulación lo atiende una sola vez y lo valida.
+                GameMode requested = GameMode.fromId(Integer.parseInt(parts[4]));
+                MatchSimulation.ModeRequestResult result =
+                    match.requestMode(client.playerId, Integer.parseInt(parts[3]), requested);
+                logModeRequest(client, requested, result);
                 // Se devuelve la misma marca de tiempo: el cliente calcula el retardo.
-                send(Protocol.join(Protocol.PONG, parts[4]), in.address, in.port);
+                send(Protocol.join(Protocol.PONG, parts[5]), in.address, in.port);
                 break;
             case Protocol.DISCONNECT:
                 removeClient(client, "se desconecto");

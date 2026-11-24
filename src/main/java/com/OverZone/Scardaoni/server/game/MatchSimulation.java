@@ -7,6 +7,7 @@ import com.OverZone.Scardaoni.shared.GameMode;
 import com.OverZone.Scardaoni.shared.MatchPhase;
 import com.OverZone.Scardaoni.shared.Team;
 import com.OverZone.Scardaoni.shared.PlayerInput;
+import com.OverZone.Scardaoni.shared.PowerUpType;
 import com.OverZone.Scardaoni.shared.Protocol;
 import com.OverZone.Scardaoni.shared.WorldSnapshot;
 import com.OverZone.Scardaoni.shared.Arena;
@@ -16,6 +17,7 @@ import com.badlogic.gdx.math.Vector2;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 
 /**
  * La partida real. Solo existe en el SERVIDOR.
@@ -65,8 +67,8 @@ public class MatchSimulation {
         int lastAbilityCount = 0;
         float fireCooldown = 0f;
         boolean ready = false;
-        /** Último modo que pidió este jugador (para reaccionar solo cuando cambia el pedido). */
-        GameMode requestedMode = GameMode.FREE_FOR_ALL;
+        /** Número del último pedido de modo atendido (cada pedido se atiende una sola vez). */
+        int lastModeRequest = 0;
 
         Slot(Player player) {
             this.player = player;
@@ -78,6 +80,11 @@ public class MatchSimulation {
     private final List<Slot> slots = new ArrayList<>();
     private final List<Projectile> projectiles = new ArrayList<>();
     private final List<RegenZone> zones = new ArrayList<>();
+    private final List<PowerUp> powerUps = new ArrayList<>();
+    /** Tiempo que falta para que aparezca el próximo Power-Up. */
+    private float powerUpTimer = PowerUpType.FIRST_SPAWN_DELAY;
+    private int nextPowerUpId = 1;
+    private final Random random = new Random();
 
     private GameMode mode = GameMode.FREE_FOR_ALL;
     private MatchPhase phase = MatchPhase.LOBBY;
@@ -182,28 +189,42 @@ public class MatchSimulation {
         }
     }
 
+    /** Resultado de un pedido de cambio de modo (para mostrarlo en la consola). */
+    public enum ModeRequestResult {
+        /** No es un pedido nuevo (es la repetición de uno ya atendido). */
+        REPEATED,
+        ACCEPTED,
+        ALREADY_SELECTED,
+        NOT_HOST,
+        NOT_ENOUGH_PLAYERS,
+        MATCH_STARTED
+    }
+
     /**
-     * Pedido de cambio de modo. El servidor lo acepta solo si:
+     * Pedido de cambio de modo. Cada pedido trae un número que el cliente
+     * sube cada vez que el jugador elige un modo (como el contador de la
+     * habilidad). El pedido viaja repetido en todos los PING: el servidor
+     * atiende cada número una sola vez, así una pérdida de paquetes no lo
+     * hace perder y una repetición no lo aplica dos veces.
+     *
+     * Se acepta solo si:
      *   - viene del anfitrión,
      *   - la partida no empezó (sala de espera o cuenta regresiva), y
      *   - el modo se puede jugar con los jugadores que hay (Equipos: 4 exactos).
-     * Si no se cumple, el pedido se ignora y todos siguen viendo el modo actual.
-     *
-     * El pedido llega repetido en cada PING; solo se tiene en cuenta cuando
-     * cambia. Así, un pedido de Equipos rechazado con 3 jugadores no se
-     * aplica solo cuando entra el cuarto: el anfitrión tiene que volver a elegirlo.
      */
-    public void requestMode(int playerId, GameMode requested) {
+    public ModeRequestResult requestMode(int playerId, int requestNumber, GameMode requested) {
         Slot slot = findSlot(playerId);
-        if (slot == null || requested == slot.requestedMode) return;
-        slot.requestedMode = requested;
-        if (phase != MatchPhase.LOBBY && phase != MatchPhase.COUNTDOWN) return;
-        if (playerId != getHostId() || requested == mode) return;
-        if (!requested.allows(slots.size())) return;
+        if (slot == null || requestNumber <= slot.lastModeRequest) return ModeRequestResult.REPEATED;
+        slot.lastModeRequest = requestNumber;
+        if (playerId != getHostId()) return ModeRequestResult.NOT_HOST;
+        if (phase != MatchPhase.LOBBY && phase != MatchPhase.COUNTDOWN) return ModeRequestResult.MATCH_STARTED;
+        if (requested == mode) return ModeRequestResult.ALREADY_SELECTED;
+        if (!requested.allows(slots.size())) return ModeRequestResult.NOT_ENOUGH_PLAYERS;
         mode = requested;
         // Al cambiar el modo se vuelve a la sala, así nadie arranca sin enterarse.
         phase = MatchPhase.LOBBY;
         assignTeams();
+        return ModeRequestResult.ACCEPTED;
     }
 
     // ------------------------------------------------------------------
@@ -254,6 +275,8 @@ public class MatchSimulation {
         endReason = "-";
         projectiles.clear();
         zones.clear();
+        powerUps.clear();
+        powerUpTimer = PowerUpType.FIRST_SPAWN_DELAY;
         int blueIndex = 0, redIndex = 0;
         for (Slot s : slots) {
             int team = s.player.getTeam();
@@ -297,6 +320,7 @@ public class MatchSimulation {
         }
         projectiles.clear();
         zones.clear();
+        powerUps.clear();
     }
 
     private void backToLobby() {
@@ -333,6 +357,7 @@ public class MatchSimulation {
         }
 
         updateZones(delta);
+        updatePowerUps(delta);
         updateProjectiles(delta);
         resolveCollisions();
 
@@ -433,8 +458,10 @@ public class MatchSimulation {
             dirX = facing.x;
             dirY = facing.y;
         }
+        // El daño se fija al disparar: si tiene Sobrecarga, el proyectil pega más fuerte.
         projectiles.add(new Projectile(nextProjectileId++, player.getId(), player.getTeam(),
-            player.getCharacter(), player.getX(), player.getY(), dirX, dirY));
+            player.getCharacter(), player.getX(), player.getY(), dirX, dirY,
+            player.getCharacter().damage * player.getDamageMultiplier()));
         s.fireCooldown = player.getCharacter().fireCooldown;
         // Disparar delata a Phantom: el camuflaje se corta.
         player.breakCamouflage();
@@ -458,6 +485,49 @@ public class MatchSimulation {
                 }
             }
         }
+    }
+
+    /**
+     * Power-Ups: cada tanto aparece uno nuevo, de un tipo al azar, en un punto
+     * libre del mapa; y el primer jugador vivo que lo toque se lo lleva.
+     */
+    private void updatePowerUps(float delta) {
+        powerUpTimer -= delta;
+        if (powerUpTimer <= 0f) {
+            powerUpTimer = PowerUpType.SPAWN_INTERVAL;
+            if (powerUps.size() < PowerUpType.MAX_ON_MAP) spawnPowerUp();
+        }
+
+        Iterator<PowerUp> it = powerUps.iterator();
+        while (it.hasNext()) {
+            PowerUp pu = it.next();
+            for (Slot s : slots) {
+                Player p = s.player;
+                if (pu.touches(p) && p.canPickUp(pu.getType())) {
+                    p.applyPowerUp(pu.getType());
+                    it.remove();
+                    break;
+                }
+            }
+        }
+    }
+
+    private void spawnPowerUp() {
+        // Puntos de aparición que no tienen ya un Power-Up encima
+        List<Integer> free = new ArrayList<>();
+        for (int i = 0; i < Arena.POWERUP_SPAWNS.length; i++) {
+            boolean taken = false;
+            for (PowerUp pu : powerUps) {
+                if (pu.getSpawnIndex() == i) taken = true;
+            }
+            if (!taken) free.add(i);
+        }
+        if (free.isEmpty()) return;
+        int index = free.get(random.nextInt(free.size()));
+        PowerUpType[] types = PowerUpType.values();
+        PowerUpType type = types[random.nextInt(types.length)];
+        float[] pos = Arena.POWERUP_SPAWNS[index];
+        powerUps.add(new PowerUp(nextPowerUpId++, type, index, pos[0], pos[1]));
     }
 
     /** En Equipos el campo cura a todo el equipo de Iris; en Todos contra todos, solo a Iris. */
@@ -626,7 +696,8 @@ public class MatchSimulation {
                 p.getId(), p.getName(), p.getTeam(), p.getCharacter().id(), p.getX(), p.getY(),
                 p.getFacingDirection(), p.isMoving(), p.isAlive(), p.getHealth(),
                 p.isAbilityActive(), p.getShieldAngle(), p.isInvulnerable(), s.ready,
-                p.getKills(), p.getDeaths(), p.getAbilityCooldownProgress(), p.getRespawnRemaining()));
+                p.getKills(), p.getDeaths(), p.getAbilityCooldownProgress(), p.getRespawnRemaining(),
+                p.getBoosts()));
         }
         List<WorldSnapshot.ProjectileState> prs = new ArrayList<>();
         for (Projectile p : projectiles) {
@@ -638,8 +709,12 @@ public class MatchSimulation {
             zs.add(new WorldSnapshot.ZoneState(z.getId(), z.getOwnerId(), z.getTeam(),
                 z.getX(), z.getY(), z.getRadius(), z.getRemaining()));
         }
+        List<WorldSnapshot.PowerUpState> pus = new ArrayList<>();
+        for (PowerUp pu : powerUps) {
+            pus.add(new WorldSnapshot.PowerUpState(pu.getId(), pu.getType().id(), pu.getX(), pu.getY()));
+        }
         return new WorldSnapshot(seq, phase, Math.max(0f, phaseTimer), scoreBlue, scoreRed,
-            winner, endReason, mode.id(), getHostId(), ps, prs, zs, 0L);
+            winner, endReason, mode.id(), getHostId(), ps, prs, zs, pus, 0L);
     }
 
     public MatchPhase getPhase() {

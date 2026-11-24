@@ -20,7 +20,7 @@ import java.util.Locale;
  *   OVERZONE_DISCOVER                      (broadcast) ¿hay algún servidor?
  *   CONNECT;nombre;version                 quiero unirme
  *   INPUT;seq;moveX;moveY;aimX;aimY;fire;abilityCount
- *   PING;listo;personaje;modo;marcaDeTiempo  sigo conectado (cada 250 ms)
+ *   PING;listo;personaje;nPedidoModo;modo;marcaDeTiempo  sigo conectado (cada 250 ms)
  *   DISCONNECT                             me voy
  *
  * Servidor → Cliente
@@ -38,7 +38,7 @@ public final class Protocol {
      * distintos: si uno se actualiza y el otro no, esta versión no coincide
      * y la conexión se rechaza con un aviso claro.
      */
-    public static final int VERSION = 3;
+    public static final int VERSION = 4;
 
     public static final int SERVER_PORT = 5555;
     public static final int MAX_PLAYERS = 4;

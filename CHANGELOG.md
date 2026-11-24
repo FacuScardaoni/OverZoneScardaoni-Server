@@ -4,6 +4,20 @@ Todos los cambios importantes realizados en el **servidor de OverZone** serán d
 
 El formato utilizado está basado en el estándar **Keep a Changelog**, organizando las modificaciones desde las más recientes hasta las más antiguas.
 
+## [0.7.1] - 2026-11-24
+
+**Protocolo versión 4: hay que actualizar también el cliente.**
+
+### Corregido
+
+* El cambio de modo a veces no reaccionaba. Ahora el `PING` trae un **pedido de modo numerado** (`PING;listo;personaje;nPedidoModo;modo;marca`) y `MatchSimulation.requestMode` atiende cada número una sola vez: no se pierde con la pérdida de paquetes y cada clic del anfitrión es un pedido nuevo.
+
+### Agregado
+
+* **Power-Ups temporales**: `PowerUp` (en el mapa) y `PowerUpType` (paquete `shared`). `MatchSimulation.updatePowerUps` hace aparecer uno al azar en un punto libre de `Arena.POWERUP_SPAWNS` (a los 5 s y después cada 8 s, hasta 3), detecta quién lo agarra y aplica el efecto: Botiquín (+50 de vida, solo si falta vida), Turbo (+35 % de velocidad), Sobrecarga (+50 % de daño) y Blindaje (mitad de daño recibido), los tres últimos por 6 s. Se pierden al morir.
+* `Projectile` guarda su propio daño (para la Sobrecarga).
+* La consola muestra los pedidos de modo rechazados y el motivo: "no es el anfitrion", "hacen falta 4 jugadores" o "la partida ya empezo".
+
 ## [0.7.0] - 2026-11-22
 
 **Protocolo versión 3: hay que actualizar también el cliente.**

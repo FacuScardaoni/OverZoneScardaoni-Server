@@ -21,8 +21,8 @@ import java.util.List;
  * siguiente la reemplaza por completo y el cliente se pone al día solo.
  *
  * Formato del mensaje:
- *   STATE;seq;fase;tiempo;puntosAzul;puntosRojo;ganador;motivoFin;modo;anfitrion;JUGADORES;PROYECTILES;ZONAS
- * donde JUGADORES, PROYECTILES y ZONAS son listas separadas por "|" con sus
+ *   STATE;seq;fase;tiempo;puntosAzul;puntosRojo;ganador;motivoFin;modo;anfitrion;JUGADORES;PROYECTILES;ZONAS;POWERUPS
+ * donde JUGADORES, PROYECTILES, ZONAS y POWERUPS son listas separadas por "|" con sus
  * campos separados por ",". Una lista vacía se escribe "-".
  *
  * El campo "team" de cada jugador depende del modo: en Equipos es el equipo
@@ -55,11 +55,17 @@ public class WorldSnapshot {
         /** 0 = habilidad lista, 1 = recién usada. */
         public final float abilityCooldown;
         public final float respawnIn;
+        /**
+         * Segundos que le quedan a cada Power-Up temporal, en el orden de
+         * PowerUpType (el Botiquín es instantáneo y siempre vale 0).
+         * Viajan en un solo campo separados por ":" (ej.: "0:3.5:0:0").
+         */
+        public final float[] boosts;
 
         public PlayerState(int id, String name, int team, int character, float x, float y, int facing,
                            boolean moving, boolean alive, float health, boolean abilityActive,
                            float shieldAngle, boolean invulnerable, boolean ready, int kills, int deaths,
-                           float abilityCooldown, float respawnIn) {
+                           float abilityCooldown, float respawnIn, float[] boosts) {
             this.id = id;
             this.name = name;
             this.team = team;
@@ -78,13 +84,25 @@ public class WorldSnapshot {
             this.deaths = deaths;
             this.abilityCooldown = abilityCooldown;
             this.respawnIn = respawnIn;
+            this.boosts = boosts;
+        }
+
+        /** Segundos que le quedan a ese Power-Up (0 si no está activo). */
+        public float boost(PowerUpType type) {
+            return type.id() < boosts.length ? boosts[type.id()] : 0f;
+        }
+
+        public boolean hasAnyBoost() {
+            for (float b : boosts) if (b > 0f) return true;
+            return false;
         }
 
         String encode() {
             return id + "," + name + "," + team + "," + character + "," + Protocol.f(x) + "," + Protocol.f(y) + ","
                 + facing + "," + b(moving) + "," + b(alive) + "," + Protocol.f(health) + ","
                 + b(abilityActive) + "," + Math.round(shieldAngle) + "," + b(invulnerable) + "," + b(ready) + ","
-                + kills + "," + deaths + "," + Protocol.f(abilityCooldown) + "," + Protocol.f(respawnIn);
+                + kills + "," + deaths + "," + Protocol.f(abilityCooldown) + "," + Protocol.f(respawnIn) + ","
+                + encodeBoosts(boosts);
         }
 
         static PlayerState decode(String s) {
@@ -95,7 +113,23 @@ public class WorldSnapshot {
                 bool(f[7]), bool(f[8]), Float.parseFloat(f[9]),
                 bool(f[10]), Float.parseFloat(f[11]), bool(f[12]), bool(f[13]),
                 Integer.parseInt(f[14]), Integer.parseInt(f[15]),
-                Float.parseFloat(f[16]), Float.parseFloat(f[17]));
+                Float.parseFloat(f[16]), Float.parseFloat(f[17]), decodeBoosts(f[18]));
+        }
+
+        private static String encodeBoosts(float[] boosts) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < boosts.length; i++) {
+                if (i > 0) sb.append(':');
+                sb.append(Protocol.f(boosts[i]));
+            }
+            return sb.toString();
+        }
+
+        private static float[] decodeBoosts(String s) {
+            String[] parts = s.split(":");
+            float[] boosts = new float[PowerUpType.values().length];
+            for (int i = 0; i < parts.length && i < boosts.length; i++) boosts[i] = Float.parseFloat(parts[i]);
+            return boosts;
         }
     }
 
@@ -157,6 +191,34 @@ public class WorldSnapshot {
         }
     }
 
+    /** Power-Up tirado en el mapa, esperando que alguien lo agarre. */
+    public static class PowerUpState {
+        public final int id;
+        public final int type;
+        public final float x, y;
+
+        public PowerUpState(int id, int type, float x, float y) {
+            this.id = id;
+            this.type = type;
+            this.x = x;
+            this.y = y;
+        }
+
+        public PowerUpType getType() {
+            return PowerUpType.fromId(type);
+        }
+
+        String encode() {
+            return id + "," + type + "," + Protocol.f(x) + "," + Protocol.f(y);
+        }
+
+        static PowerUpState decode(String s) {
+            String[] f = s.split(",");
+            return new PowerUpState(Integer.parseInt(f[0]), Integer.parseInt(f[1]),
+                Float.parseFloat(f[2]), Float.parseFloat(f[3]));
+        }
+    }
+
     public final long seq;
     public final MatchPhase phase;
     /** Según la fase: segundos de cuenta regresiva, de partida o de resultados. */
@@ -176,12 +238,14 @@ public class WorldSnapshot {
     public final List<PlayerState> players;
     public final List<ProjectileState> projectiles;
     public final List<ZoneState> zones;
+    public final List<PowerUpState> powerUps;
     /** Momento en que el cliente recibió esta foto (System.nanoTime). Lo completa el cliente. */
     public final long receivedNanos;
 
     public WorldSnapshot(long seq, MatchPhase phase, float phaseTimer, int scoreBlue, int scoreRed,
                          int winner, String endReason, int mode, int hostId, List<PlayerState> players,
-                         List<ProjectileState> projectiles, List<ZoneState> zones, long receivedNanos) {
+                         List<ProjectileState> projectiles, List<ZoneState> zones,
+                         List<PowerUpState> powerUps, long receivedNanos) {
         this.seq = seq;
         this.phase = phase;
         this.phaseTimer = phaseTimer;
@@ -194,6 +258,7 @@ public class WorldSnapshot {
         this.players = Collections.unmodifiableList(players);
         this.projectiles = Collections.unmodifiableList(projectiles);
         this.zones = Collections.unmodifiableList(zones);
+        this.powerUps = Collections.unmodifiableList(powerUps);
         this.receivedNanos = receivedNanos;
     }
 
@@ -206,6 +271,13 @@ public class WorldSnapshot {
 
     public ProjectileState findProjectile(int id) {
         for (ProjectileState p : projectiles) {
+            if (p.id == id) return p;
+        }
+        return null;
+    }
+
+    public PowerUpState findPowerUp(int id) {
+        for (PowerUpState p : powerUps) {
             if (p.id == id) return p;
         }
         return null;
@@ -246,6 +318,8 @@ public class WorldSnapshot {
         appendList(sb, projectiles);
         sb.append(';');
         appendList(sb, zones);
+        sb.append(';');
+        appendList(sb, powerUps);
         return sb.toString();
     }
 
@@ -259,7 +333,8 @@ public class WorldSnapshot {
             Object item = items.get(i);
             if (item instanceof PlayerState) sb.append(((PlayerState) item).encode());
             else if (item instanceof ProjectileState) sb.append(((ProjectileState) item).encode());
-            else sb.append(((ZoneState) item).encode());
+            else if (item instanceof ZoneState) sb.append(((ZoneState) item).encode());
+            else sb.append(((PowerUpState) item).encode());
         }
     }
 
@@ -279,6 +354,10 @@ public class WorldSnapshot {
         if (!parts[12].equals("-")) {
             for (String s : parts[12].split("\\|")) zones.add(ZoneState.decode(s));
         }
+        List<PowerUpState> powerUps = new ArrayList<>();
+        if (!parts[13].equals("-")) {
+            for (String s : parts[13].split("\\|")) powerUps.add(PowerUpState.decode(s));
+        }
         return new WorldSnapshot(
             Long.parseLong(parts[1]),
             MatchPhase.valueOf(parts[2]),
@@ -289,7 +368,7 @@ public class WorldSnapshot {
             parts[7],
             Integer.parseInt(parts[8]),
             Integer.parseInt(parts[9]),
-            players, projectiles, zones, receivedNanos);
+            players, projectiles, zones, powerUps, receivedNanos);
     }
 
     private static String b(boolean v) { return v ? "1" : "0"; }

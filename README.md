@@ -11,6 +11,7 @@ Es un servidor **autoritativo** sobre **UDP**: es el único programa que ejecuta
 * Responde al **broadcast** de los clientes, así lo encuentran en la red local sin escribir ninguna IP.
 * Administra la sala de espera (hasta 4 jugadores), la cuenta regresiva, la partida y los resultados. Al terminar, vuelve solo a la sala para jugar otra partida.
 * Dos modos de juego: **Todos contra todos** (2 a 4 jugadores) y **Equipos 2v2** (exactamente 4). Lo elige el anfitrión (el primer jugador conectado) y el servidor valida que se pueda jugar con los jugadores que hay.
+* Power-Ups temporales (Botiquín, Turbo, Sobrecarga y Blindaje): el servidor decide cuándo y dónde aparecen, quién los agarra y aplica el efecto.
 * Cuatro personajes: Volt, Brutus, Iris y Phantom. El servidor aplica sus habilidades, incluido el Campo de Regeneración de Iris (cura a los aliados dentro de la zona) y el Camuflaje Óptico de Phantom.
 * Simula la partida 60 veces por segundo con paso de tiempo fijo y envía el estado completo a los clientes 30 veces por segundo.
 * Detecta desconexiones (avisadas o por tiempo de espera), avisa a los clientes al cerrarse y cierra sus hilos y su socket de forma ordenada.
@@ -65,14 +66,16 @@ src/main/java/com/OverZone/Scardaoni/
 │   └── game/              La partida real (solo existe en el servidor)
 │       ├── MatchSimulation    reglas, etapas, modos, anfitrión, equipos, colisiones, puntaje
 │       ├── Player             jugador: vida, habilidad, curación, muerte y reaparición
-│       ├── Projectile         proyectil (con alcance máximo)
-│       └── RegenZone          Campo de Regeneración de Iris
+│       ├── Projectile         proyectil (con alcance máximo y su propio daño)
+│       ├── RegenZone          Campo de Regeneración de Iris
+│       └── PowerUp            Power-Up tirado en el mapa
 └── shared/            COMPARTIDO con el cliente (copia idéntica)
     ├── Protocol           mensajes, puerto, tiempos y versión del protocolo
     ├── PlayerInput        entradas que envía el cliente
     ├── WorldSnapshot      estado de la partida que envía el servidor
     ├── CharacterType      estadísticas de Volt, Brutus, Iris y Phantom
     ├── GameMode           Todos contra todos / Equipos 2v2
+    ├── PowerUpType        tipos de Power-Up, efectos y tiempos
     ├── MatchPhase, Team, Direction, GameConstants
     └── Arena, Obstacle    el mapa
 ```

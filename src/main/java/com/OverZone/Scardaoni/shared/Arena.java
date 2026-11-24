@@ -54,6 +54,18 @@ public class Arena {
      * Busca el lugar libre de obstáculos más cercano al punto indicado,
      * recorriendo círculos cada vez más grandes alrededor de él.
      */
+    /**
+     * Lugares donde pueden aparecer los Power-Ups (centros, sin obstáculos).
+     * Están en zonas disputadas, entre las bases, para que haya que arriesgarse.
+     */
+    public static final float[][] POWERUP_SPAWNS = {
+        {WIDTH / 2f, HEIGHT / 2f},   // centro
+        {224f, HEIGHT / 2f},         // pasillo izquierdo
+        {WIDTH - 224f, HEIGHT / 2f}, // pasillo derecho
+        {340f, 120f},                // abajo a la izquierda del centro
+        {WIDTH - 340f, HEIGHT - 120f} // arriba a la derecha del centro
+    };
+
     public Vector2 findFreeSpawnNear(float centerX, float centerY, float entitySize) {
         if (isFreeFor(centerX, centerY, entitySize)) {
             return new Vector2(centerX, centerY);

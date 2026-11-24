@@ -19,11 +19,19 @@ public class Projectile {
     private float x, y;
     private final float dirX, dirY;
     private boolean alive = true;
+    /** Daño que hace al pegar (puede estar aumentado por el Power-Up Sobrecarga). */
+    private final float damage;
     /** Distancia recorrida desde que se disparó. */
     private float traveled = 0f;
 
     public Projectile(int id, int ownerId, int team, CharacterType character,
                       float x, float y, float dirX, float dirY) {
+        this(id, ownerId, team, character, x, y, dirX, dirY, character.damage);
+    }
+
+    public Projectile(int id, int ownerId, int team, CharacterType character,
+                      float x, float y, float dirX, float dirY, float damage) {
+        this.damage = damage;
         this.id = id;
         this.ownerId = ownerId;
         this.team = team;
@@ -55,7 +63,7 @@ public class Projectile {
         return new Rectangle(x - size / 2f, y - size / 2f, size, size);
     }
 
-    public float getDamage() { return character.damage; }
+    public float getDamage() { return damage; }
     public CharacterType getCharacter() { return character; }
     public float getDirX() { return dirX; }
     public float getDirY() { return dirY; }

@@ -1,6 +1,7 @@
 package com.OverZone.Scardaoni.server.game;
 
 import com.OverZone.Scardaoni.shared.CharacterType;
+import com.OverZone.Scardaoni.shared.PowerUpType;
 import com.OverZone.Scardaoni.shared.Direction;
 import com.OverZone.Scardaoni.shared.GameConstants;
 import com.badlogic.gdx.math.Rectangle;
@@ -48,6 +49,9 @@ public class Player {
     // Escudo Cinético (Brutus): hacia dónde apunta, con largo 1
     private float shieldDirX = 0f, shieldDirY = -1f;
 
+    /** Segundos que le quedan a cada Power-Up temporal (en el orden de PowerUpType). */
+    private final float[] boosts = new float[PowerUpType.values().length];
+
     private float invulnerableTimeRemaining = 0f;
 
     private int kills = 0;
@@ -75,6 +79,46 @@ public class Player {
         if (abilityTimeRemaining > 0) abilityTimeRemaining -= delta;
         if (abilityCooldownRemaining > 0) abilityCooldownRemaining -= delta;
         if (invulnerableTimeRemaining > 0) invulnerableTimeRemaining -= delta;
+        for (int i = 0; i < boosts.length; i++) {
+            if (boosts[i] > 0) boosts[i] = Math.max(0f, boosts[i] - delta);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Power-Ups
+    // ------------------------------------------------------------------
+
+    /**
+     * ¿Le sirve este Power-Up? El Botiquín solo se agarra si falta vida, así
+     * no se desperdicia pasando por arriba con la vida llena.
+     */
+    public boolean canPickUp(PowerUpType type) {
+        if (!alive) return false;
+        return type != PowerUpType.HEALTH || health < character.maxHealth;
+    }
+
+    /** Aplica el efecto de un Power-Up. Si ya estaba activo, se reinicia su tiempo. */
+    public void applyPowerUp(PowerUpType type) {
+        if (type == PowerUpType.HEALTH) heal(PowerUpType.HEAL_AMOUNT);
+        else boosts[type.id()] = type.duration;
+    }
+
+    public boolean hasBoost(PowerUpType type) {
+        return boosts[type.id()] > 0f;
+    }
+
+    /** Copia de los tiempos que le quedan a cada Power-Up (para el estado). */
+    public float[] getBoosts() {
+        return boosts.clone();
+    }
+
+    /** Multiplicador de daño de los disparos (Sobrecarga). */
+    public float getDamageMultiplier() {
+        return hasBoost(PowerUpType.OVERLOAD) ? PowerUpType.OVERLOAD_FACTOR : 1f;
+    }
+
+    private void clearBoosts() {
+        java.util.Arrays.fill(boosts, 0f);
     }
 
     // ------------------------------------------------------------------
@@ -145,10 +189,13 @@ public class Player {
     }
 
     public float getCurrentSpeed() {
-        if (isDashing()) return character.speed * DASH_SPEED_MULTIPLIER;
+        float speed = character.speed;
+        if (isDashing()) speed *= DASH_SPEED_MULTIPLIER;
         // Con el escudo levantado, Brutus camina un poco más lento.
-        if (isShieldActive()) return character.speed * CharacterType.SHIELD_SPEED_FACTOR;
-        return character.speed;
+        else if (isShieldActive()) speed *= CharacterType.SHIELD_SPEED_FACTOR;
+        // Power-Up Turbo
+        if (hasBoost(PowerUpType.TURBO)) speed *= PowerUpType.TURBO_FACTOR;
+        return speed;
     }
 
     public float getDashDirX() { return dashDirX; }
@@ -176,6 +223,9 @@ public class Player {
             }
         }
 
+        // Power-Up Blindaje: se recibe la mitad del daño.
+        if (hasBoost(PowerUpType.ARMOR)) amount *= PowerUpType.ARMOR_FACTOR;
+
         health -= amount;
         invulnerableTimeRemaining = HIT_INVULNERABILITY;
         if (health <= 0) {
@@ -184,6 +234,7 @@ public class Player {
             moving = false;
             abilityTimeRemaining = 0;
             respawnRemaining = RESPAWN_DELAY;
+            clearBoosts(); // al morir se pierden los Power-Ups
             deaths++;
             return true;
         }
@@ -204,6 +255,7 @@ public class Player {
         abilityTimeRemaining = 0f;
         abilityCooldownRemaining = 0f;
         invulnerableTimeRemaining = SPAWN_INVULNERABILITY;
+        clearBoosts();
     }
 
     /** Deja al jugador como al principio de una partida nueva. */
