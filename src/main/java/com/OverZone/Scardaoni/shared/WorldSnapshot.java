@@ -21,9 +21,12 @@ import java.util.List;
  * siguiente la reemplaza por completo y el cliente se pone al día solo.
  *
  * Formato del mensaje:
- *   STATE;seq;fase;tiempo;puntosAzul;puntosRojo;ganador;motivoFin;JUGADORES;PROYECTILES
- * donde JUGADORES y PROYECTILES son listas separadas por "|" con sus campos
- * separados por ",". Una lista vacía se escribe "-".
+ *   STATE;seq;fase;tiempo;puntosAzul;puntosRojo;ganador;motivoFin;modo;anfitrion;JUGADORES;PROYECTILES;ZONAS
+ * donde JUGADORES, PROYECTILES y ZONAS son listas separadas por "|" con sus
+ * campos separados por ",". Una lista vacía se escribe "-".
+ *
+ * El campo "team" de cada jugador depende del modo: en Equipos es el equipo
+ * (0 azul, 1 rojo); en Todos contra todos es un color propio (0 a 3).
  *
  * Los objetos de esta clase no cambian después de creados: así el hilo de red
  * puede armarlos y el hilo de dibujo leerlos sin pisarse.
@@ -123,23 +126,62 @@ public class WorldSnapshot {
         }
     }
 
+    /** Campo de Regeneración de Iris: un círculo que cura a los aliados que están adentro. */
+    public static class ZoneState {
+        public final int id;
+        public final int ownerId;
+        public final int team;
+        public final float x, y, radius;
+        /** Segundos que le quedan. */
+        public final float remaining;
+
+        public ZoneState(int id, int ownerId, int team, float x, float y, float radius, float remaining) {
+            this.id = id;
+            this.ownerId = ownerId;
+            this.team = team;
+            this.x = x;
+            this.y = y;
+            this.radius = radius;
+            this.remaining = remaining;
+        }
+
+        String encode() {
+            return id + "," + ownerId + "," + team + "," + Protocol.f(x) + "," + Protocol.f(y) + ","
+                + Protocol.f(radius) + "," + Protocol.f(remaining);
+        }
+
+        static ZoneState decode(String s) {
+            String[] f = s.split(",");
+            return new ZoneState(Integer.parseInt(f[0]), Integer.parseInt(f[1]), Integer.parseInt(f[2]),
+                Float.parseFloat(f[3]), Float.parseFloat(f[4]), Float.parseFloat(f[5]), Float.parseFloat(f[6]));
+        }
+    }
+
     public final long seq;
     public final MatchPhase phase;
     /** Según la fase: segundos de cuenta regresiva, de partida o de resultados. */
     public final float phaseTimer;
     public final int scoreBlue, scoreRed;
-    /** Team.BLUE, Team.RED o Team.NONE (empate o partida sin terminar). */
+    /**
+     * Ganador. En Equipos: Team.BLUE o Team.RED. En Todos contra todos: el id
+     * del jugador ganador. En los dos: -1 si hubo empate o no terminó.
+     */
     public final int winner;
     /** Por qué terminó la partida: TIME (tiempo agotado) o PLAYERS (se fueron jugadores). */
     public final String endReason;
+    /** Modo de juego (GameMode.id()). */
+    public final int mode;
+    /** Id del anfitrión de la sala (el que elige el modo). */
+    public final int hostId;
     public final List<PlayerState> players;
     public final List<ProjectileState> projectiles;
+    public final List<ZoneState> zones;
     /** Momento en que el cliente recibió esta foto (System.nanoTime). Lo completa el cliente. */
     public final long receivedNanos;
 
     public WorldSnapshot(long seq, MatchPhase phase, float phaseTimer, int scoreBlue, int scoreRed,
-                         int winner, String endReason, List<PlayerState> players,
-                         List<ProjectileState> projectiles, long receivedNanos) {
+                         int winner, String endReason, int mode, int hostId, List<PlayerState> players,
+                         List<ProjectileState> projectiles, List<ZoneState> zones, long receivedNanos) {
         this.seq = seq;
         this.phase = phase;
         this.phaseTimer = phaseTimer;
@@ -147,8 +189,11 @@ public class WorldSnapshot {
         this.scoreRed = scoreRed;
         this.winner = winner;
         this.endReason = endReason;
+        this.mode = mode;
+        this.hostId = hostId;
         this.players = Collections.unmodifiableList(players);
         this.projectiles = Collections.unmodifiableList(projectiles);
+        this.zones = Collections.unmodifiableList(zones);
         this.receivedNanos = receivedNanos;
     }
 
@@ -164,6 +209,16 @@ public class WorldSnapshot {
             if (p.id == id) return p;
         }
         return null;
+    }
+
+    public GameMode getMode() {
+        return GameMode.fromId(mode);
+    }
+
+    /** ¿Son rivales estos dos jugadores? En Todos contra todos, todos lo son. */
+    public boolean areEnemies(PlayerState a, PlayerState b) {
+        if (a.id == b.id) return false;
+        return getMode() == GameMode.FREE_FOR_ALL || a.team != b.team;
     }
 
     public int countTeam(int team) {
@@ -184,10 +239,13 @@ public class WorldSnapshot {
         StringBuilder sb = new StringBuilder(512);
         sb.append(Protocol.STATE).append(';').append(seq).append(';').append(phase.name()).append(';')
             .append(Protocol.f(phaseTimer)).append(';').append(scoreBlue).append(';').append(scoreRed).append(';')
-            .append(winner).append(';').append(endReason).append(';');
+            .append(winner).append(';').append(endReason).append(';')
+            .append(mode).append(';').append(hostId).append(';');
         appendList(sb, players);
         sb.append(';');
         appendList(sb, projectiles);
+        sb.append(';');
+        appendList(sb, zones);
         return sb.toString();
     }
 
@@ -199,7 +257,9 @@ public class WorldSnapshot {
         for (int i = 0; i < items.size(); i++) {
             if (i > 0) sb.append('|');
             Object item = items.get(i);
-            sb.append(item instanceof PlayerState ? ((PlayerState) item).encode() : ((ProjectileState) item).encode());
+            if (item instanceof PlayerState) sb.append(((PlayerState) item).encode());
+            else if (item instanceof ProjectileState) sb.append(((ProjectileState) item).encode());
+            else sb.append(((ZoneState) item).encode());
         }
     }
 
@@ -208,12 +268,16 @@ public class WorldSnapshot {
         // El -1 conserva los campos vacíos del final en lugar de descartarlos.
         String[] parts = message.split(";", -1);
         List<PlayerState> players = new ArrayList<>();
-        if (!parts[8].equals("-")) {
-            for (String s : parts[8].split("\\|")) players.add(PlayerState.decode(s));
+        if (!parts[10].equals("-")) {
+            for (String s : parts[10].split("\\|")) players.add(PlayerState.decode(s));
         }
         List<ProjectileState> projectiles = new ArrayList<>();
-        if (!parts[9].equals("-")) {
-            for (String s : parts[9].split("\\|")) projectiles.add(ProjectileState.decode(s));
+        if (!parts[11].equals("-")) {
+            for (String s : parts[11].split("\\|")) projectiles.add(ProjectileState.decode(s));
+        }
+        List<ZoneState> zones = new ArrayList<>();
+        if (!parts[12].equals("-")) {
+            for (String s : parts[12].split("\\|")) zones.add(ZoneState.decode(s));
         }
         return new WorldSnapshot(
             Long.parseLong(parts[1]),
@@ -223,7 +287,9 @@ public class WorldSnapshot {
             Integer.parseInt(parts[5]),
             Integer.parseInt(parts[6]),
             parts[7],
-            players, projectiles, receivedNanos);
+            Integer.parseInt(parts[8]),
+            Integer.parseInt(parts[9]),
+            players, projectiles, zones, receivedNanos);
     }
 
     private static String b(boolean v) { return v ? "1" : "0"; }

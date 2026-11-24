@@ -4,6 +4,7 @@ import com.OverZone.Scardaoni.server.game.Player;
 import com.OverZone.Scardaoni.shared.MatchPhase;
 import com.OverZone.Scardaoni.server.game.MatchSimulation;
 import com.OverZone.Scardaoni.shared.CharacterType;
+import com.OverZone.Scardaoni.shared.GameMode;
 import com.OverZone.Scardaoni.shared.PlayerInput;
 import com.OverZone.Scardaoni.shared.Protocol;
 
@@ -242,11 +243,15 @@ public class GameServer {
 
         while (running) {
             MatchPhase before = match.getPhase();
+            GameMode modeBefore = match.getMode();
             processInbox();
             dropSilentClients();
             match.update(delta);
             if (match.getPhase() != before) {
                 System.out.println("Fase: " + before + " -> " + match.getPhase());
+            }
+            if (match.getMode() != modeBefore) {
+                System.out.println("Modo: " + modeBefore.displayName + " -> " + match.getMode().displayName);
             }
 
             if (tick % ticksPerState == 0) broadcastState();
@@ -345,8 +350,10 @@ public class GameServer {
             case Protocol.PING:
                 match.setReady(client.playerId, "1".equals(parts[1]));
                 match.setCharacter(client.playerId, CharacterType.fromId(Integer.parseInt(parts[2])));
+                // Solo el anfitrión puede cambiar el modo; la simulación lo valida.
+                match.requestMode(client.playerId, GameMode.fromId(Integer.parseInt(parts[3])));
                 // Se devuelve la misma marca de tiempo: el cliente calcula el retardo.
-                send(Protocol.join(Protocol.PONG, parts[3]), in.address, in.port);
+                send(Protocol.join(Protocol.PONG, parts[4]), in.address, in.port);
                 break;
             case Protocol.DISCONNECT:
                 removeClient(client, "se desconecto");
@@ -440,7 +447,8 @@ public class GameServer {
     }
 
     private void printStatus() {
-        System.out.println("Fase: " + match.getPhase() + " | Jugadores: " + match.getPlayerCount());
+        System.out.println("Fase: " + match.getPhase() + " | Modo: " + match.getMode().displayName
+            + " | Jugadores: " + match.getPlayerCount() + "/" + Protocol.MAX_PLAYERS);
         synchronized (clients) {
             for (ConnectedClient c : clients) {
                 long ms = (System.nanoTime() - c.lastPacketNanos) / 1_000_000L;

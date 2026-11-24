@@ -3,9 +3,11 @@ package com.OverZone.Scardaoni.server.game;
 import com.OverZone.Scardaoni.shared.Direction;
 import com.OverZone.Scardaoni.shared.CharacterType;
 import com.OverZone.Scardaoni.shared.GameConstants;
+import com.OverZone.Scardaoni.shared.GameMode;
 import com.OverZone.Scardaoni.shared.MatchPhase;
 import com.OverZone.Scardaoni.shared.Team;
 import com.OverZone.Scardaoni.shared.PlayerInput;
+import com.OverZone.Scardaoni.shared.Protocol;
 import com.OverZone.Scardaoni.shared.WorldSnapshot;
 import com.OverZone.Scardaoni.shared.Arena;
 import com.badlogic.gdx.math.Rectangle;
@@ -19,8 +21,16 @@ import java.util.List;
  * La partida real. Solo existe en el SERVIDOR.
  *
  * Contiene la lógica que antes estaba en GameScreen (movimiento con
- * colisiones, impulso, disparos, daño), ahora aplicada a varios jugadores
- * y con equipos, eliminaciones, reapariciones y etapas de partida.
+ * colisiones, habilidades, disparos, daño), aplicada a hasta 4 jugadores,
+ * con eliminaciones, reapariciones, etapas de partida y dos modos de juego:
+ *
+ *   - Todos contra todos: cada uno juega solo. El campo "team" de cada
+ *     jugador es su color (0 a 3). Gana el que tenga más eliminaciones.
+ *   - Equipos 2v2: azul contra rojo. Solo con exactamente 4 jugadores.
+ *
+ * El modo lo elige el anfitrión (el primero de la lista de jugadores). El
+ * servidor decide si el pedido es válido: con menos de 4 jugadores no deja
+ * elegir Equipos.
  *
  * No sabe nada de la red ni de la pantalla: recibe entradas (applyInput),
  * avanza en el tiempo (update) y entrega una foto del estado (createSnapshot).
@@ -38,6 +48,14 @@ public class MatchSimulation {
     private static final float SPAWN_BLUE_X = 90f;
     private static final float SPAWN_RED_X = Arena.WIDTH - 90f;
 
+    /** Puntos de aparición de Todos contra todos: uno cerca de cada esquina. */
+    private static final float[][] FFA_SPAWNS = {
+        {90f, 110f},
+        {Arena.WIDTH - 90f, Arena.HEIGHT - 110f},
+        {90f, Arena.HEIGHT - 110f},
+        {Arena.WIDTH - 90f, 110f},
+    };
+
     /** Lo que el servidor guarda de cada jugador además de su entidad. */
     private static class Slot {
         final Player player;
@@ -47,6 +65,8 @@ public class MatchSimulation {
         int lastAbilityCount = 0;
         float fireCooldown = 0f;
         boolean ready = false;
+        /** Último modo que pidió este jugador (para reaccionar solo cuando cambia el pedido). */
+        GameMode requestedMode = GameMode.FREE_FOR_ALL;
 
         Slot(Player player) {
             this.player = player;
@@ -57,28 +77,34 @@ public class MatchSimulation {
     /** Ordenados por orden de llegada. */
     private final List<Slot> slots = new ArrayList<>();
     private final List<Projectile> projectiles = new ArrayList<>();
+    private final List<RegenZone> zones = new ArrayList<>();
 
+    private GameMode mode = GameMode.FREE_FOR_ALL;
     private MatchPhase phase = MatchPhase.LOBBY;
     private float phaseTimer = 0f;
     private int scoreBlue = 0, scoreRed = 0;
+    /** Equipo ganador (Equipos) o id del jugador ganador (Todos contra todos); -1 si empate. */
     private int winner = Team.NONE;
     private String endReason = "-";
 
     private int nextPlayerId = 1;
     private int nextProjectileId = 1;
+    private int nextZoneId = 1;
 
     // ------------------------------------------------------------------
     // Jugadores que entran y salen
     // ------------------------------------------------------------------
 
-    /** Agrega un jugador nuevo y lo ubica en el equipo con menos integrantes. */
+    /** Agrega un jugador nuevo y le asigna equipo (o color) y lugar de aparición. */
     public Player addPlayer(String name) {
-        int team = countTeam(Team.BLUE) <= countTeam(Team.RED) ? Team.BLUE : Team.RED;
-        Vector2 spawn = spawnPointFor(team, countTeam(team));
+        int team = mode == GameMode.TEAMS
+            ? (countTeam(Team.BLUE) <= countTeam(Team.RED) ? Team.BLUE : Team.RED)
+            : firstFreeColor();
+        Vector2 spawn = mode == GameMode.TEAMS ? spawnPointFor(team, countTeam(team)) : ffaSpawn(team);
         Player player = new Player(nextPlayerId++, name, team, spawn.x, spawn.y);
         slots.add(new Slot(player));
         if (phase == MatchPhase.LOBBY || phase == MatchPhase.COUNTDOWN) {
-            rebalanceTeams();
+            assignTeams();
         }
         return player;
     }
@@ -87,14 +113,25 @@ public class MatchSimulation {
         Slot slot = findSlot(playerId);
         if (slot == null) return;
         slots.remove(slot);
+        // Si se va Iris, su campo desaparece con ella.
+        zones.removeIf(z -> z.getOwnerId() == playerId);
 
         if (phase == MatchPhase.LOBBY || phase == MatchPhase.COUNTDOWN) {
-            rebalanceTeams();
-        } else if (phase == MatchPhase.PLAYING
-            && (countTeam(Team.BLUE) == 0 || countTeam(Team.RED) == 0)) {
-            // Un equipo se quedó sin jugadores: no tiene sentido seguir.
+            // Si ya no hay 4 jugadores, el modo por equipos deja de estar permitido.
+            if (!mode.allows(slots.size())) mode = GameMode.FREE_FOR_ALL;
+            assignTeams();
+        } else if (phase == MatchPhase.PLAYING && !enoughPlayersToContinue()) {
+            // Sin rivales no tiene sentido seguir.
             endMatch("PLAYERS");
         }
+    }
+
+    /** Durante la partida: ¿quedan rivales para seguir jugando? */
+    private boolean enoughPlayersToContinue() {
+        if (mode == GameMode.TEAMS) {
+            return countTeam(Team.BLUE) > 0 && countTeam(Team.RED) > 0;
+        }
+        return slots.size() >= 2;
     }
 
     public boolean hasPlayer(int playerId) {
@@ -103,6 +140,15 @@ public class MatchSimulation {
 
     public int getPlayerCount() {
         return slots.size();
+    }
+
+    /** El anfitrión es el primero de la lista (el que lleva más tiempo conectado). */
+    public int getHostId() {
+        return slots.isEmpty() ? -1 : slots.get(0).player.getId();
+    }
+
+    public GameMode getMode() {
+        return mode;
     }
 
     // ------------------------------------------------------------------
@@ -136,6 +182,30 @@ public class MatchSimulation {
         }
     }
 
+    /**
+     * Pedido de cambio de modo. El servidor lo acepta solo si:
+     *   - viene del anfitrión,
+     *   - la partida no empezó (sala de espera o cuenta regresiva), y
+     *   - el modo se puede jugar con los jugadores que hay (Equipos: 4 exactos).
+     * Si no se cumple, el pedido se ignora y todos siguen viendo el modo actual.
+     *
+     * El pedido llega repetido en cada PING; solo se tiene en cuenta cuando
+     * cambia. Así, un pedido de Equipos rechazado con 3 jugadores no se
+     * aplica solo cuando entra el cuarto: el anfitrión tiene que volver a elegirlo.
+     */
+    public void requestMode(int playerId, GameMode requested) {
+        Slot slot = findSlot(playerId);
+        if (slot == null || requested == slot.requestedMode) return;
+        slot.requestedMode = requested;
+        if (phase != MatchPhase.LOBBY && phase != MatchPhase.COUNTDOWN) return;
+        if (playerId != getHostId() || requested == mode) return;
+        if (!requested.allows(slots.size())) return;
+        mode = requested;
+        // Al cambiar el modo se vuelve a la sala, así nadie arranca sin enterarse.
+        phase = MatchPhase.LOBBY;
+        assignTeams();
+    }
+
     // ------------------------------------------------------------------
     // Avance del tiempo
     // ------------------------------------------------------------------
@@ -167,8 +237,8 @@ public class MatchSimulation {
     }
 
     private boolean canStart() {
-        if (slots.size() < MIN_PLAYERS) return false;
-        if (countTeam(Team.BLUE) == 0 || countTeam(Team.RED) == 0) return false;
+        if (!mode.allows(slots.size())) return false;
+        if (mode == GameMode.TEAMS && (countTeam(Team.BLUE) != 2 || countTeam(Team.RED) != 2)) return false;
         for (Slot s : slots) {
             if (!s.ready) return false;
         }
@@ -183,13 +253,19 @@ public class MatchSimulation {
         winner = Team.NONE;
         endReason = "-";
         projectiles.clear();
+        zones.clear();
         int blueIndex = 0, redIndex = 0;
         for (Slot s : slots) {
             int team = s.player.getTeam();
-            Vector2 spawn = spawnPointFor(team, team == Team.BLUE ? blueIndex++ : redIndex++);
+            Vector2 spawn;
+            if (mode == GameMode.TEAMS) {
+                spawn = spawnPointFor(team, team == Team.BLUE ? blueIndex++ : redIndex++);
+            } else {
+                spawn = ffaSpawn(team);
+            }
             s.player.resetForNewMatch(spawn.x, spawn.y);
             s.fireCooldown = 0f;
-            // Lo que se haya pedido antes de empezar no cuenta como impulso.
+            // Lo que se haya pedido antes de empezar no cuenta como habilidad.
             s.lastAbilityCount = s.input.abilityCount;
         }
     }
@@ -198,17 +274,37 @@ public class MatchSimulation {
         phase = MatchPhase.RESULTS;
         phaseTimer = RESULTS_DURATION;
         endReason = reason;
-        if (scoreBlue > scoreRed) winner = Team.BLUE;
-        else if (scoreRed > scoreBlue) winner = Team.RED;
-        else winner = Team.NONE;
+        if (mode == GameMode.TEAMS) {
+            if (scoreBlue > scoreRed) winner = Team.BLUE;
+            else if (scoreRed > scoreBlue) winner = Team.RED;
+            else winner = Team.NONE;
+        } else {
+            // Gana el jugador con más eliminaciones; si hay dos empatados arriba, es empate.
+            winner = Team.NONE;
+            int best = -1;
+            boolean tie = false;
+            for (Slot s : slots) {
+                int k = s.player.getKills();
+                if (k > best) {
+                    best = k;
+                    winner = s.player.getId();
+                    tie = false;
+                } else if (k == best) {
+                    tie = true;
+                }
+            }
+            if (tie) winner = Team.NONE;
+        }
         projectiles.clear();
+        zones.clear();
     }
 
     private void backToLobby() {
         phase = MatchPhase.LOBBY;
         phaseTimer = 0f;
         for (Slot s : slots) s.ready = false;
-        rebalanceTeams();
+        if (!mode.allows(slots.size())) mode = GameMode.FREE_FOR_ALL;
+        assignTeams();
     }
 
     private void updatePlaying(float delta) {
@@ -224,7 +320,7 @@ public class MatchSimulation {
             p.update(delta);
 
             if (p.isReadyToRespawn()) {
-                Vector2 spawn = spawnPointFor(p.getTeam(), 0);
+                Vector2 spawn = respawnPointFor(p);
                 p.respawn(spawn.x, spawn.y);
             }
 
@@ -236,6 +332,7 @@ public class MatchSimulation {
             }
         }
 
+        updateZones(delta);
         updateProjectiles(delta);
         resolveCollisions();
 
@@ -254,14 +351,30 @@ public class MatchSimulation {
         // Habilidad: hubo un pedido nuevo si el contador creció.
         if (in.abilityCount != s.lastAbilityCount) {
             s.lastAbilityCount = in.abilityCount;
-            if (player.getCharacter() == CharacterType.VOLT) {
-                // Impulso: hacia donde camina o, si está quieto, hacia el mouse.
-                float dashX = pressingMovementKeys ? in.moveX : aimDx;
-                float dashY = pressingMovementKeys ? in.moveY : aimDy;
-                player.tryUseAbility(dashX, dashY);
-            } else {
-                // Escudo: hacia donde apunta el mouse.
-                player.tryUseAbility(aimDx, aimDy);
+            switch (player.getCharacter()) {
+                case VOLT: {
+                    // Impulso: hacia donde camina o, si está quieto, hacia el mouse.
+                    float dashX = pressingMovementKeys ? in.moveX : aimDx;
+                    float dashY = pressingMovementKeys ? in.moveY : aimDy;
+                    player.tryUseAbility(dashX, dashY);
+                    break;
+                }
+                case BRUTUS:
+                    // Escudo: hacia donde apunta el mouse.
+                    player.tryUseAbility(aimDx, aimDy);
+                    break;
+                case IRIS:
+                    // Campo de Regeneración: se crea donde está parada Iris.
+                    if (player.tryUseAbility(0, 0)) {
+                        zones.add(new RegenZone(nextZoneId++, player.getId(), player.getTeam(),
+                            player.getX(), player.getY(), player.getCharacter().abilityDuration));
+                    }
+                    break;
+                case PHANTOM:
+                    // Camuflaje Óptico: el servidor marca a Phantom como camuflado
+                    // y lo manda en el estado; cada cliente lo dibuja casi invisible.
+                    player.tryUseAbility(0, 0);
+                    break;
             }
         }
         // Mientras el escudo está activo, sigue la dirección del mouse.
@@ -323,6 +436,34 @@ public class MatchSimulation {
         projectiles.add(new Projectile(nextProjectileId++, player.getId(), player.getTeam(),
             player.getCharacter(), player.getX(), player.getY(), dirX, dirY));
         s.fireCooldown = player.getCharacter().fireCooldown;
+        // Disparar delata a Phantom: el camuflaje se corta.
+        player.breakCamouflage();
+    }
+
+    /** Cura a los aliados dentro de cada Campo de Regeneración y borra los que vencieron. */
+    private void updateZones(float delta) {
+        Iterator<RegenZone> it = zones.iterator();
+        while (it.hasNext()) {
+            RegenZone z = it.next();
+            z.update(delta);
+            if (!z.isAlive()) {
+                it.remove();
+                continue;
+            }
+            for (Slot s : slots) {
+                Player p = s.player;
+                if (!p.isAlive() || !isAllyOfZone(p, z)) continue;
+                if (z.contains(p.getX(), p.getY())) {
+                    p.heal(CharacterType.REGEN_PER_SECOND * delta);
+                }
+            }
+        }
+    }
+
+    /** En Equipos el campo cura a todo el equipo de Iris; en Todos contra todos, solo a Iris. */
+    private boolean isAllyOfZone(Player p, RegenZone z) {
+        if (mode == GameMode.TEAMS) return p.getTeam() == z.getTeam();
+        return p.getId() == z.getOwnerId();
     }
 
     private void updateProjectiles(float delta) {
@@ -346,16 +487,18 @@ public class MatchSimulation {
 
             for (Slot s : slots) {
                 Player target = s.player;
-                // Sin fuego amigo: solo se daña al equipo contrario.
-                if (!target.isAlive() || target.getTeam() == p.getTeam()) continue;
+                // Sin fuego amigo: solo se daña a los rivales.
+                if (!target.isAlive() || !isEnemyOf(target, p)) continue;
                 if (!target.getBounds().overlaps(bounds)) continue;
 
                 boolean eliminated = target.takeDamage(p.getDamage(), p.getDirX(), p.getDirY());
                 if (eliminated) {
                     Slot shooter = findSlot(p.getOwnerId());
                     if (shooter != null) shooter.player.addKill();
-                    if (p.getTeam() == Team.BLUE) scoreBlue++;
-                    else scoreRed++;
+                    if (mode == GameMode.TEAMS) {
+                        if (p.getTeam() == Team.BLUE) scoreBlue++;
+                        else scoreRed++;
+                    }
                 }
                 p.kill();
                 break;
@@ -373,22 +516,78 @@ public class MatchSimulation {
     // Equipos y puntos de aparición
     // ------------------------------------------------------------------
 
-    /** Reparte los equipos de forma alternada según el orden de llegada. */
-    private void rebalanceTeams() {
+    /** ¿El proyectil puede dañar a este jugador? */
+    private boolean isEnemyOf(Player target, Projectile p) {
+        if (target.getId() == p.getOwnerId()) return false;
+        if (mode == GameMode.TEAMS) return target.getTeam() != p.getTeam();
+        return true; // Todos contra todos: cualquiera que no sea uno mismo
+    }
+
+    /**
+     * Reparte equipos según el modo y ubica a cada uno en su lugar de aparición.
+     *   - Equipos: alternado por orden de llegada (azul, rojo, azul, rojo).
+     *   - Todos contra todos: cada uno recibe su propio color (0, 1, 2, 3).
+     */
+    private void assignTeams() {
         int blueIndex = 0, redIndex = 0;
         for (int i = 0; i < slots.size(); i++) {
             Player p = slots.get(i).player;
-            int team = (i % 2 == 0) ? Team.BLUE : Team.RED;
-            p.setTeam(team);
-            Vector2 spawn = spawnPointFor(team, team == Team.BLUE ? blueIndex++ : redIndex++);
+            Vector2 spawn;
+            if (mode == GameMode.TEAMS) {
+                int team = (i % 2 == 0) ? Team.BLUE : Team.RED;
+                p.setTeam(team);
+                spawn = spawnPointFor(team, team == Team.BLUE ? blueIndex++ : redIndex++);
+            } else {
+                p.setTeam(i);
+                spawn = ffaSpawn(i);
+            }
             p.respawn(spawn.x, spawn.y);
         }
+    }
+
+    /** Primer color libre (para alguien que entra con la partida en juego). */
+    private int firstFreeColor() {
+        for (int c = 0; c < Protocol.MAX_PLAYERS; c++) {
+            if (countTeam(c) == 0) return c;
+        }
+        return 0;
     }
 
     private Vector2 spawnPointFor(int team, int indexInTeam) {
         float x = team == Team.BLUE ? SPAWN_BLUE_X : SPAWN_RED_X;
         float y = Arena.HEIGHT / 2f + (indexInTeam - 0.5f) * 60f;
         return arena.findFreeSpawnNear(x, y, Player.SIZE);
+    }
+
+    private Vector2 ffaSpawn(int color) {
+        float[] pos = FFA_SPAWNS[Math.floorMod(color, FFA_SPAWNS.length)];
+        return arena.findFreeSpawnNear(pos[0], pos[1], Player.SIZE);
+    }
+
+    /**
+     * Dónde reaparece alguien eliminado.
+     *   - Equipos: en la base de su equipo.
+     *   - Todos contra todos: en la esquina más alejada de los rivales vivos,
+     *     para no reaparecer al lado de quien lo acaba de eliminar.
+     */
+    private Vector2 respawnPointFor(Player p) {
+        if (mode == GameMode.TEAMS) return spawnPointFor(p.getTeam(), 0);
+        float bestDistance = -1f;
+        float[] best = FFA_SPAWNS[0];
+        for (float[] pos : FFA_SPAWNS) {
+            float nearest = Float.MAX_VALUE;
+            for (Slot s : slots) {
+                Player other = s.player;
+                if (other == p || !other.isAlive()) continue;
+                float dx = other.getX() - pos[0], dy = other.getY() - pos[1];
+                nearest = Math.min(nearest, dx * dx + dy * dy);
+            }
+            if (nearest > bestDistance) {
+                bestDistance = nearest;
+                best = pos;
+            }
+        }
+        return arena.findFreeSpawnNear(best[0], best[1], Player.SIZE);
     }
 
     private static Vector2 facingVector(int facing) {
@@ -434,8 +633,13 @@ public class MatchSimulation {
             prs.add(new WorldSnapshot.ProjectileState(p.getId(), p.getTeam(), p.getCharacter().id(),
                 p.getX(), p.getY()));
         }
+        List<WorldSnapshot.ZoneState> zs = new ArrayList<>();
+        for (RegenZone z : zones) {
+            zs.add(new WorldSnapshot.ZoneState(z.getId(), z.getOwnerId(), z.getTeam(),
+                z.getX(), z.getY(), z.getRadius(), z.getRemaining()));
+        }
         return new WorldSnapshot(seq, phase, Math.max(0f, phaseTimer), scoreBlue, scoreRed,
-            winner, endReason, ps, prs, 0L);
+            winner, endReason, mode.id(), getHostId(), ps, prs, zs, 0L);
     }
 
     public MatchPhase getPhase() {

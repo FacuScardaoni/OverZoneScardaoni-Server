@@ -4,6 +4,26 @@ Todos los cambios importantes realizados en el **servidor de OverZone** serán d
 
 El formato utilizado está basado en el estándar **Keep a Changelog**, organizando las modificaciones desde las más recientes hasta las más antiguas.
 
+## [0.7.0] - 2026-11-22
+
+**Protocolo versión 3: hay que actualizar también el cliente.**
+
+### Agregado
+
+* `GameMode`: **Todos contra todos** (2 a 4 jugadores, gana el jugador con más eliminaciones; empate si hay dos arriba) y **Equipos 2v2** (exactamente 4 jugadores).
+* **Anfitrión:** el primer jugador de la lista elige el modo. `MatchSimulation.requestMode` solo acepta el pedido del anfitrión, antes de empezar, y si el modo es válido con los jugadores que hay. El pedido se procesa solo cuando cambia.
+* Si estando en Equipos alguien se va de la sala, vuelve a Todos contra todos.
+* Aparición en las cuatro esquinas en Todos contra todos; al reaparecer, en la esquina más lejana de los rivales vivos.
+* **Iris:** `RegenZone`, el Campo de Regeneración, que cura 14 de vida por segundo a los aliados dentro (en Todos contra todos, solo a Iris).
+* **Phantom:** Camuflaje Óptico, que se corta al disparar.
+* Alcance máximo de los proyectiles según el personaje.
+* El comando `estado` y los mensajes de la consola muestran el modo de juego.
+
+### Cambiado
+
+* Recargas según la propuesta: Volt 10 s, Brutus 15 s. Brutus camina al 75 % de su velocidad con el escudo activo.
+* Protocolo versión 3: el `PING` incluye el modo pedido; el `STATE` incluye el modo, el anfitrión y los campos de regeneración.
+
 ## [0.5.0] - 2026-11-19
 
 ### Agregado

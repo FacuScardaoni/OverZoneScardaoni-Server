@@ -11,7 +11,11 @@ import com.badlogic.gdx.math.Rectangle;
  * Guarda el estado real del jugador y aplica sus reglas: daño, muerte,
  * reaparición y la habilidad de su personaje. Las estadísticas (vida,
  * velocidad, daño, habilidad) salen de su CharacterType, así el mismo código
- * sirve para Volt y para Brutus.
+ * sirve para los cuatro personajes:
+ *   - Volt:    Impulso Over (sale disparado hacia donde camina).
+ *   - Brutus:  Escudo Cinético (frena el 70 % del daño que viene de frente).
+ *   - Iris:    Campo de Regeneración (la zona la crea y la maneja MatchSimulation).
+ *   - Phantom: Camuflaje Óptico (casi invisible; se corta si dispara).
  */
 public class Player {
 
@@ -35,7 +39,7 @@ public class Player {
     private int facingDirection = Direction.DOWN;
     private boolean moving = false;
 
-    /** Tiempo que le queda a la habilidad activa (impulso o escudo). */
+    /** Tiempo que le queda a la habilidad activa (impulso, escudo, campo o camuflaje). */
     private float abilityTimeRemaining = 0f;
     private float abilityCooldownRemaining = 0f;
 
@@ -84,16 +88,19 @@ public class Player {
     public boolean tryUseAbility(float dirX, float dirY) {
         if (!alive || abilityCooldownRemaining > 0f || isAbilityActive()) return false;
         float len = (float) Math.sqrt(dirX * dirX + dirY * dirY);
-        if (len == 0) return false;
+        boolean needsDirection = character == CharacterType.VOLT || character == CharacterType.BRUTUS;
+        if (needsDirection && len == 0) return false;
 
         abilityTimeRemaining = character.abilityDuration;
         abilityCooldownRemaining = character.abilityCooldown;
         if (character == CharacterType.VOLT) {
             dashDirX = dirX / len;
             dashDirY = dirY / len;
-        } else {
+        } else if (character == CharacterType.BRUTUS) {
             setShieldDirection(dirX, dirY);
         }
+        // Iris y Phantom no necesitan dirección: el campo se crea donde está
+        // Iris (lo hace MatchSimulation) y el camuflaje solo dura un tiempo.
         return true;
     }
 
@@ -107,6 +114,21 @@ public class Player {
 
     public boolean isShieldActive() {
         return character == CharacterType.BRUTUS && isAbilityActive();
+    }
+
+    public boolean isCamouflaged() {
+        return character == CharacterType.PHANTOM && isAbilityActive();
+    }
+
+    /** Phantom se hace visible de nuevo (por ejemplo, al disparar). */
+    public void breakCamouflage() {
+        if (isCamouflaged()) abilityTimeRemaining = 0f;
+    }
+
+    /** Recupera vida sin pasarse del máximo del personaje. */
+    public void heal(float amount) {
+        if (!alive) return;
+        health = Math.min(character.maxHealth, health + amount);
     }
 
     /** El escudo sigue hacia donde apunta Brutus mientras está activo. */
@@ -123,7 +145,10 @@ public class Player {
     }
 
     public float getCurrentSpeed() {
-        return isDashing() ? character.speed * DASH_SPEED_MULTIPLIER : character.speed;
+        if (isDashing()) return character.speed * DASH_SPEED_MULTIPLIER;
+        // Con el escudo levantado, Brutus camina un poco más lento.
+        if (isShieldActive()) return character.speed * CharacterType.SHIELD_SPEED_FACTOR;
+        return character.speed;
     }
 
     public float getDashDirX() { return dashDirX; }

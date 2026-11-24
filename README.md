@@ -9,7 +9,9 @@ El juego (cliente) está en otro repositorio: [**OverZoneScardaoni**](https://gi
 Es un servidor **autoritativo** sobre **UDP**: es el único programa que ejecuta la lógica de la partida. Los clientes solo le envían sus entradas (teclas, mouse, disparo, habilidad) y dibujan el estado que el servidor les manda.
 
 * Responde al **broadcast** de los clientes, así lo encuentran en la red local sin escribir ninguna IP.
-* Administra la sala de espera, los equipos (Azul y Rojo, de 2 a 4 jugadores), la cuenta regresiva, la partida y los resultados. Al terminar, vuelve solo a la sala para jugar otra partida.
+* Administra la sala de espera (hasta 4 jugadores), la cuenta regresiva, la partida y los resultados. Al terminar, vuelve solo a la sala para jugar otra partida.
+* Dos modos de juego: **Todos contra todos** (2 a 4 jugadores) y **Equipos 2v2** (exactamente 4). Lo elige el anfitrión (el primer jugador conectado) y el servidor valida que se pueda jugar con los jugadores que hay.
+* Cuatro personajes: Volt, Brutus, Iris y Phantom. El servidor aplica sus habilidades, incluido el Campo de Regeneración de Iris (cura a los aliados dentro de la zona) y el Camuflaje Óptico de Phantom.
 * Simula la partida 60 veces por segundo con paso de tiempo fijo y envía el estado completo a los clientes 30 veces por segundo.
 * Detecta desconexiones (avisadas o por tiempo de espera), avisa a los clientes al cerrarse y cierra sus hilos y su socket de forma ordenada.
 
@@ -44,7 +46,7 @@ java -jar build\libs\OverZone-Server-1.0.0.jar MiServidor
 
 | Comando | Qué hace |
 | --- | --- |
-| `estado` | Muestra la etapa de la partida y los jugadores conectados. |
+| `estado` | Muestra la etapa de la partida, el modo de juego y los jugadores conectados. |
 | `retardo <ms>` | Simula una red lenta, agregando ese retardo en cada sentido (ej.: `retardo 150`). |
 | `perdida <%>` | Simula paquetes perdidos (ej.: `perdida 20`). |
 | `normal` | Quita el retardo y la pérdida simulados. |
@@ -61,14 +63,16 @@ src/main/java/com/OverZone/Scardaoni/
 │   ├── GameServer         socket UDP, hilos, mensajes, clientes conectados
 │   ├── ConnectedClient    dirección y jugador de cada cliente
 │   └── game/              La partida real (solo existe en el servidor)
-│       ├── MatchSimulation    reglas, etapas, equipos, colisiones, puntaje
-│       ├── Player             jugador: vida, habilidad (impulso o escudo), muerte y reaparición
-│       └── Projectile         proyectil
+│       ├── MatchSimulation    reglas, etapas, modos, anfitrión, equipos, colisiones, puntaje
+│       ├── Player             jugador: vida, habilidad, curación, muerte y reaparición
+│       ├── Projectile         proyectil (con alcance máximo)
+│       └── RegenZone          Campo de Regeneración de Iris
 └── shared/            COMPARTIDO con el cliente (copia idéntica)
     ├── Protocol           mensajes, puerto, tiempos y versión del protocolo
     ├── PlayerInput        entradas que envía el cliente
     ├── WorldSnapshot      estado de la partida que envía el servidor
-    ├── CharacterType      estadísticas de Volt y Brutus
+    ├── CharacterType      estadísticas de Volt, Brutus, Iris y Phantom
+    ├── GameMode           Todos contra todos / Equipos 2v2
     ├── MatchPhase, Team, Direction, GameConstants
     └── Arena, Obstacle    el mapa
 ```

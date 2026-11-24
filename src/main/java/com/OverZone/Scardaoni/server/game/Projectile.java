@@ -6,8 +6,9 @@ import com.badlogic.gdx.math.Rectangle;
 /**
  * Proyectil. Lo crea y lo mueve el servidor.
  *
- * Recuerda quién lo disparó, de qué equipo es (solo daña al equipo contrario)
- * y con qué personaje: de eso dependen su velocidad, su tamaño y su daño.
+ * Recuerda quién lo disparó, de qué equipo es (solo daña a los rivales) y con
+ * qué personaje: de eso dependen su velocidad, su tamaño, su daño y su
+ * alcance. Cuando recorre su alcance máximo, desaparece.
  */
 public class Projectile {
 
@@ -18,6 +19,8 @@ public class Projectile {
     private float x, y;
     private final float dirX, dirY;
     private boolean alive = true;
+    /** Distancia recorrida desde que se disparó. */
+    private float traveled = 0f;
 
     public Projectile(int id, int ownerId, int team, CharacterType character,
                       float x, float y, float dirX, float dirY) {
@@ -40,8 +43,11 @@ public class Projectile {
     }
 
     public void update(float delta) {
-        x += dirX * character.projectileSpeed * delta;
-        y += dirY * character.projectileSpeed * delta;
+        float step = character.projectileSpeed * delta;
+        x += dirX * step;
+        y += dirY * step;
+        traveled += step;
+        if (traveled >= character.projectileRange) alive = false;
     }
 
     public Rectangle getBounds() {
