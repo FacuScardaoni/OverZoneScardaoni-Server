@@ -3,10 +3,10 @@
  *   - OverZoneScardaoni         (cliente)
  *   - OverZoneScardaoni-Server  (servidor)
  * Tiene que ser IDÉNTICO en los dos. Si lo cambiás en uno, copialo al otro.
- * Si cambia el formato de algún mensaje, subí también Protocol.VERSION, así
+ * Si cambia el formato de algún mensaje, subí también Protocolo.VERSION, así
  * un cliente y un servidor de versiones distintas se avisan en lugar de fallar.
  */
-package com.OverZone.Scardaoni.shared;
+package com.OverZone.Scardaoni.compartido;
 
 /**
  * Modos de juego.
@@ -19,18 +19,18 @@ package com.OverZone.Scardaoni.shared;
  * Lo elige el anfitrión de la sala (el primer jugador conectado). El servidor
  * valida el pedido: si no hay 4 jugadores, no acepta el modo por equipos.
  */
-public enum GameMode {
+public enum ModoJuego {
 
-    FREE_FOR_ALL("Todos contra todos", 2),
-    TEAMS("Equipos 2v2", 4);
+    TODOS_CONTRA_TODOS("Todos contra todos", 2),
+    EQUIPOS("Equipos 2v2", 4);
 
-    public final String displayName;
+    public final String nombreVisible;
     /** Jugadores necesarios para jugar este modo. */
-    public final int requiredPlayers;
+    public final int jugadoresNecesarios;
 
-    GameMode(String displayName, int requiredPlayers) {
-        this.displayName = displayName;
-        this.requiredPlayers = requiredPlayers;
+    ModoJuego(String nombreVisible, int jugadoresNecesarios) {
+        this.nombreVisible = nombreVisible;
+        this.jugadoresNecesarios = jugadoresNecesarios;
     }
 
     /** Número con el que viaja por la red. */
@@ -38,13 +38,13 @@ public enum GameMode {
         return ordinal();
     }
 
-    public static GameMode fromId(int id) {
-        GameMode[] all = values();
-        return (id >= 0 && id < all.length) ? all[id] : FREE_FOR_ALL;
+    public static ModoJuego desdeId(int id) {
+        ModoJuego[] todos = values();
+        return (id >= 0 && id < todos.length) ? todos[id] : TODOS_CONTRA_TODOS;
     }
 
     /** ¿Se puede jugar este modo con esta cantidad de jugadores? */
-    public boolean allows(int players) {
-        return this == TEAMS ? players == requiredPlayers : players >= requiredPlayers;
+    public boolean permite(int jugadores) {
+        return this == EQUIPOS ? jugadores == jugadoresNecesarios : jugadores >= jugadoresNecesarios;
     }
 }

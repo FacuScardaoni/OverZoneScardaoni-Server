@@ -3,10 +3,10 @@
  *   - OverZoneScardaoni         (cliente)
  *   - OverZoneScardaoni-Server  (servidor)
  * Tiene que ser IDÉNTICO en los dos. Si lo cambiás en uno, copialo al otro.
- * Si cambia el formato de algún mensaje, subí también Protocol.VERSION, así
+ * Si cambia el formato de algún mensaje, subí también Protocolo.VERSION, así
  * un cliente y un servidor de versiones distintas se avisan en lugar de fallar.
  */
-package com.OverZone.Scardaoni.shared;
+package com.OverZone.Scardaoni.compartido;
 
 /**
  * Direcciones hacia las que puede mirar un personaje.
@@ -16,20 +16,20 @@ package com.OverZone.Scardaoni.shared;
  * Están en el paquete de entidades, y no en el de gráficos, porque el
  * servidor también las usa y el servidor no dibuja nada.
  */
-public final class Direction {
+public final class Direccion {
 
-    public static final int DOWN = 0;
-    public static final int LEFT = 1;
-    public static final int RIGHT = 2;
-    public static final int UP = 3;
+    public static final int ABAJO = 0;
+    public static final int IZQUIERDA = 1;
+    public static final int DERECHA = 2;
+    public static final int ARRIBA = 3;
 
-    private Direction() { }
+    private Direccion() { }
 
     /** Elige una de las cuatro direcciones a partir de un vector (x, y). */
-    public static int fromVector(float x, float y) {
+    public static int desdeVector(float x, float y) {
         if (Math.abs(x) > Math.abs(y)) {
-            return x > 0 ? RIGHT : LEFT;
+            return x > 0 ? DERECHA : IZQUIERDA;
         }
-        return y > 0 ? UP : DOWN;
+        return y > 0 ? ARRIBA : ABAJO;
     }
 }

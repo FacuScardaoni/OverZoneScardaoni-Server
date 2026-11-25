@@ -4,6 +4,18 @@ Todos los cambios importantes realizados en el **servidor de OverZone** serán d
 
 El formato utilizado está basado en el estándar **Keep a Changelog**, organizando las modificaciones desde las más recientes hasta las más antiguas.
 
+## [0.8.0] - 2026-11-25
+
+Código en español. **Cambia el protocolo (versión 5): hay que actualizar los dos repositorios.**
+
+### Cambiado
+
+* Todos los nombres propios del código pasaron a español: paquetes (`shared` → `compartido`, `screens` → `pantallas`, `network` → `red`, `ui` → `interfaz`, `input` → `entrada`, `graphics` → `graficos`, `server` → `servidor`, `server.game` → `servidor.juego`), clases (`Main` → `JuegoOverZone`, `MatchSimulation` → `SimulacionPartida`, `ClientNetwork` → `RedCliente`, `WorldSnapshot` → `EstadoMundo`...), métodos, campos, variables y constantes. La tabla completa está en `docs/nombres.md` del repositorio del cliente.
+* Quedan en inglés solo los nombres que define LibGDX o Java (`render`, `dispose`, `touchDown`, `SpriteBatch`...), las palabras del protocolo (`PING`, `STATE`, `INPUT`...), los nombres de los personajes y las variables de una o dos letras (`x`, `dx`, `i`).
+* Los nombres de las etapas de la partida que viajan en el `STATE` ahora son `SALA`, `CUENTA_REGRESIVA`, `JUGANDO` y `RESULTADOS`, por eso sube la versión del protocolo.
+* Lanzadores: `Lwjgl3Launcher` → `LanzadorEscritorio` (cliente) y `ServerLauncher` → `LanzadorServidor` (servidor); `build.gradle` ya apunta a los nombres nuevos.
+* Los hilos tienen nombres en español: `RedCliente`, `ServidorRecepcion`, `ServidorBucleJuego` y `ServidorCierre`.
+
 ## [0.7.1] - 2026-11-24
 
 **Protocolo versión 4: hay que actualizar también el cliente.**

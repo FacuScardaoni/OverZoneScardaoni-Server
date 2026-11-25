@@ -3,10 +3,10 @@
  *   - OverZoneScardaoni         (cliente)
  *   - OverZoneScardaoni-Server  (servidor)
  * Tiene que ser IDÉNTICO en los dos. Si lo cambiás en uno, copialo al otro.
- * Si cambia el formato de algún mensaje, subí también Protocol.VERSION, así
+ * Si cambia el formato de algún mensaje, subí también Protocolo.VERSION, así
  * un cliente y un servidor de versiones distintas se avisan en lugar de fallar.
  */
-package com.OverZone.Scardaoni.shared;
+package com.OverZone.Scardaoni.compartido;
 
 /**
  * Personajes jugables y sus estadísticas, tomados de la propuesta del juego.
@@ -21,7 +21,7 @@ package com.OverZone.Scardaoni.shared;
  *   Iris     Aegis Protocol    Soporte   110   125    15    medio   Campo de Regeneración (20 s)
  *   Phantom  Shadow Syndicate  Asesino    90   170    38    corto   Camuflaje Óptico (18 s)
  */
-public enum CharacterType {
+public enum TipoPersonaje {
 
     VOLT("Volt", "CyberCore", "Asalto",
         100f, 140f, 0.22f, 25f, 340f, 6f, 330f,
@@ -40,60 +40,60 @@ public enum CharacterType {
         "Camuflaje Óptico", "Casi invisible por unos segundos", 18f, 4f);
 
     /** Parte del daño frontal que absorbe el Escudo Cinético (0,7 = 70 %). */
-    public static final float SHIELD_ABSORB = 0.7f;
+    public static final float ABSORCION_ESCUDO = 0.7f;
     /** Brutus se mueve un poco más lento con el escudo activo (75 % de su velocidad). */
-    public static final float SHIELD_SPEED_FACTOR = 0.75f;
+    public static final float FACTOR_VELOCIDAD_ESCUDO = 0.75f;
     /** Radio del Campo de Regeneración de Iris. */
-    public static final float REGEN_RADIUS = 56f;
+    public static final float RADIO_REGENERACION = 56f;
     /** Vida por segundo que recuperan los aliados dentro del campo. */
-    public static final float REGEN_PER_SECOND = 14f;
+    public static final float REGENERACION_POR_SEGUNDO = 14f;
 
     /**
      * Qué tan "de frente" tiene que venir un disparo para que el escudo lo
      * frene. Se compara con el coseno del ángulo: 0,4 equivale a un cono de
      * unos 66 grados hacia cada lado de donde apunta Brutus.
      */
-    public static final float SHIELD_FRONT_COS = 0.4f;
+    public static final float COS_FRENTE_ESCUDO = 0.4f;
 
-    public final String displayName;
-    public final String faction;
-    public final String role;
-    public final float maxHealth;
+    public final String nombreVisible;
+    public final String faccion;
+    public final String rol;
+    public final float vidaMaxima;
     /** Unidades por segundo. */
-    public final float speed;
+    public final float velocidad;
     /** Segundos entre disparos. */
-    public final float fireCooldown;
-    public final float damage;
-    public final float projectileSpeed;
-    public final float projectileSize;
+    public final float recargaDisparo;
+    public final float danio;
+    public final float velocidadProyectil;
+    public final float tamanioProyectil;
     /** Distancia máxima que recorre un disparo antes de desaparecer. */
-    public final float projectileRange;
-    public final String abilityName;
-    public final String abilityDescription;
+    public final float alcanceProyectil;
+    public final String nombreHabilidad;
+    public final String descripcionHabilidad;
     /** Segundos hasta poder volver a usar la habilidad. */
-    public final float abilityCooldown;
+    public final float recargaHabilidad;
     /** Segundos que dura la habilidad activa. */
-    public final float abilityDuration;
+    public final float duracionHabilidad;
 
-    CharacterType(String displayName, String faction, String role,
-                  float maxHealth, float speed, float fireCooldown, float damage,
-                  float projectileSpeed, float projectileSize, float projectileRange,
-                  String abilityName, String abilityDescription,
-                  float abilityCooldown, float abilityDuration) {
-        this.displayName = displayName;
-        this.faction = faction;
-        this.role = role;
-        this.maxHealth = maxHealth;
-        this.speed = speed;
-        this.fireCooldown = fireCooldown;
-        this.damage = damage;
-        this.projectileSpeed = projectileSpeed;
-        this.projectileSize = projectileSize;
-        this.projectileRange = projectileRange;
-        this.abilityName = abilityName;
-        this.abilityDescription = abilityDescription;
-        this.abilityCooldown = abilityCooldown;
-        this.abilityDuration = abilityDuration;
+    TipoPersonaje(String nombreVisible, String faccion, String rol,
+                  float vidaMaxima, float velocidad, float recargaDisparo, float danio,
+                  float velocidadProyectil, float tamanioProyectil, float alcanceProyectil,
+                  String nombreHabilidad, String descripcionHabilidad,
+                  float recargaHabilidad, float duracionHabilidad) {
+        this.nombreVisible = nombreVisible;
+        this.faccion = faccion;
+        this.rol = rol;
+        this.vidaMaxima = vidaMaxima;
+        this.velocidad = velocidad;
+        this.recargaDisparo = recargaDisparo;
+        this.danio = danio;
+        this.velocidadProyectil = velocidadProyectil;
+        this.tamanioProyectil = tamanioProyectil;
+        this.alcanceProyectil = alcanceProyectil;
+        this.nombreHabilidad = nombreHabilidad;
+        this.descripcionHabilidad = descripcionHabilidad;
+        this.recargaHabilidad = recargaHabilidad;
+        this.duracionHabilidad = duracionHabilidad;
     }
 
     /** Número con el que viaja por la red (0 = Volt, 1 = Brutus, 2 = Iris, 3 = Phantom). */
@@ -102,8 +102,8 @@ public enum CharacterType {
     }
 
     /** Convierte el número recibido por la red en un personaje. Si no es válido, Volt. */
-    public static CharacterType fromId(int id) {
-        CharacterType[] all = values();
-        return (id >= 0 && id < all.length) ? all[id] : VOLT;
+    public static TipoPersonaje desdeId(int id) {
+        TipoPersonaje[] todos = values();
+        return (id >= 0 && id < todos.length) ? todos[id] : VOLT;
     }
 }

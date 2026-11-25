@@ -22,7 +22,7 @@ dependencies {
 }
 
 application {
-  mainClass = 'com.OverZone.Scardaoni.server.ServerLauncher'
+  mainClass = 'com.OverZone.Scardaoni.servidor.LanzadorServidor'
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -43,6 +43,6 @@ jar {
   from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
   exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
   manifest {
-    attributes 'Main-Class': 'com.OverZone.Scardaoni.server.ServerLauncher'
+    attributes 'Main-Class': 'com.OverZone.Scardaoni.servidor.LanzadorServidor'
   }
 }

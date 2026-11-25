@@ -18,6 +18,9 @@ Es un servidor **autoritativo** sobre **UDP**: es el único programa que ejecuta
 
 No abre ninguna ventana. Solo usa el núcleo de LibGDX por sus clases de matemática (`Rectangle`, `Vector2`).
 
+
+> **Nombres en español:** todo el código usa nombres en español (paquetes, clases, métodos y variables). La tabla de equivalencias con los nombres anteriores en inglés está en [docs/nombres.md](https://github.com/FacuScardaoni/OverZoneScardaoni/blob/main/docs/nombres.md).
+
 ## Requisitos
 
 * **Java 21.** Para comprobarlo: `java -version`.
@@ -35,7 +38,7 @@ java -jar build\libs\OverZone-Server-1.0.0.jar
 
 El primer comando genera el ejecutable (la primera vez tarda unos minutos, porque descarga Gradle y las dependencias). El segundo abre el servidor.
 
-También se puede abrir sin generar el `.jar`, con `gradlew.bat run`, o desde IntelliJ ejecutando `ServerLauncher`.
+También se puede abrir sin generar el `.jar`, con `gradlew.bat run`, o desde IntelliJ ejecutando `LanzadorServidor`.
 
 Opcionalmente se le puede dar un nombre al servidor, que los clientes ven al conectarse:
 
@@ -59,32 +62,32 @@ El servidor usa el puerto UDP **5555**. Si ya hay otro servidor abierto en la mi
 
 ```
 src/main/java/com/OverZone/Scardaoni/
-├── server/            Programa del servidor
-│   ├── ServerLauncher     punto de entrada (main)
-│   ├── GameServer         socket UDP, hilos, mensajes, clientes conectados
-│   ├── ConnectedClient    dirección y jugador de cada cliente
-│   └── game/              La partida real (solo existe en el servidor)
-│       ├── MatchSimulation    reglas, etapas, modos, anfitrión, equipos, colisiones, puntaje
-│       ├── Player             jugador: vida, habilidad, curación, muerte y reaparición
-│       ├── Projectile         proyectil (con alcance máximo y su propio daño)
-│       ├── RegenZone          Campo de Regeneración de Iris
-│       └── PowerUp            Power-Up tirado en el mapa
-└── shared/            COMPARTIDO con el cliente (copia idéntica)
-    ├── Protocol           mensajes, puerto, tiempos y versión del protocolo
-    ├── PlayerInput        entradas que envía el cliente
-    ├── WorldSnapshot      estado de la partida que envía el servidor
-    ├── CharacterType      estadísticas de Volt, Brutus, Iris y Phantom
-    ├── GameMode           Todos contra todos / Equipos 2v2
-    ├── PowerUpType        tipos de Power-Up, efectos y tiempos
-    ├── MatchPhase, Team, Direction, GameConstants
-    └── Arena, Obstacle    el mapa
+├── servidor/            Programa del servidor
+│   ├── LanzadorServidor     punto de entrada (main)
+│   ├── ServidorJuego         socket UDP, hilos, mensajes, clientes conectados
+│   ├── ClienteConectado    dirección y jugador de cada cliente
+│   └── juego/              La partida real (solo existe en el servidor)
+│       ├── SimulacionPartida    reglas, etapas, modos, anfitrión, equipos, colisiones, puntaje
+│       ├── Jugador             jugador: vida, habilidad, curación, muerte y reaparición
+│       ├── Proyectil         proyectil (con alcance máximo y su propio daño)
+│       ├── ZonaRegeneracion          Campo de Regeneración de Iris
+│       └── Potenciador            Power-Up tirado en el mapa
+└── compartido/            COMPARTIDO con el cliente (copia idéntica)
+    ├── Protocolo           mensajes, puerto, tiempos y versión del protocolo
+    ├── EntradaJugador        entradas que envía el cliente
+    ├── EstadoMundo      estado de la partida que envía el servidor
+    ├── TipoPersonaje      estadísticas de Volt, Brutus, Iris y Phantom
+    ├── ModoJuego           Todos contra todos / Equipos 2v2
+    ├── TipoPotenciador        tipos de Power-Up, efectos y tiempos
+    ├── FasePartida, Equipo, Direccion, ConstantesJuego
+    └── Arena, Obstaculo    el mapa
 ```
 
-### El paquete `shared`
+### El paquete `compartido`
 
-Cliente y servidor tienen que "hablar el mismo idioma", por eso el paquete `shared` está copiado en los dos repositorios y **tiene que ser idéntico en ambos**. Si se cambia algo en uno, hay que copiarlo al otro.
+Cliente y servidor tienen que "hablar el mismo idioma", por eso el paquete `compartido` está copiado en los dos repositorios y **tiene que ser idéntico en ambos**. Si se cambia algo en uno, hay que copiarlo al otro.
 
-Para que una diferencia no pase desapercibida, el cliente envía `Protocol.VERSION` al conectarse. Si no coincide con la del servidor, la conexión se rechaza y el cliente muestra la versión de cada uno. Cuando se cambia el formato de un mensaje, hay que subir ese número en los dos repositorios.
+Para que una diferencia no pase desapercibida, el cliente envía `Protocolo.VERSION` al conectarse. Si no coincide con la del servidor, la conexión se rechaza y el cliente muestra la versión de cada uno. Cuando se cambia el formato de un mensaje, hay que subir ese número en los dos repositorios.
 
 El protocolo, los hilos, el manejo de errores y el cumplimiento de los requisitos técnicos se explican en `docs/arquitectura-red.md`, en el repositorio del cliente.
 
