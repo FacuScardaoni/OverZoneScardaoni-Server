@@ -3,15 +3,7 @@ package com.OverZone.Scardaoni.servidor.juego;
 import com.OverZone.Scardaoni.compartido.TipoPersonaje;
 import com.badlogic.gdx.math.Rectangle;
 
-/**
- * Proyectil. Lo crea y lo mueve el servidor.
- *
- * Recuerda quién lo disparó, de qué equipo es (solo daña a los rivales) y con
- * qué personaje: de eso dependen su velocidad, su tamaño, su daño y su
- * alcance. Cuando recorre su alcance máximo, desaparece.
- */
 public class Proyectil {
-
     private final int id;
     private final int duenioId;
     private final int equipo;

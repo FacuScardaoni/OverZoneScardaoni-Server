@@ -4,7 +4,6 @@ import java.net.InetAddress;
 
 /** Un cliente conectado: su dirección en la red y el jugador que maneja. */
 public class ClienteConectado {
-
     final InetAddress direccionIp;
     final int puerto;
     final int jugadorId;

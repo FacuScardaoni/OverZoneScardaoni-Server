@@ -2,15 +2,7 @@ package com.OverZone.Scardaoni.servidor.juego;
 
 import com.OverZone.Scardaoni.compartido.TipoPersonaje;
 
-/**
- * Campo de Regeneración de Iris. Solo existe en el SERVIDOR.
- *
- * Es un círculo fijo en el mapa que dura unos segundos. En cada paso de la
- * simulación, SimulacionPartida cura a los aliados de Iris que estén adentro.
- * Los clientes solo reciben dónde está y cuánto le queda, para dibujarlo.
- */
 public class ZonaRegeneracion {
-
     private final int id;
     private final int duenioId;
     private final int equipo;

@@ -1,43 +1,8 @@
-/*
- * ARCHIVO COMPARTIDO entre los dos repositorios:
- *   - OverZoneScardaoni         (cliente)
- *   - OverZoneScardaoni-Server  (servidor)
- * Tiene que ser IDÉNTICO en los dos. Si lo cambiás en uno, copialo al otro.
- * Si cambia el formato de algún mensaje, subí también Protocolo.VERSION, así
- * un cliente y un servidor de versiones distintas se avisan en lugar de fallar.
- */
 package com.OverZone.Scardaoni.compartido;
 
 import java.util.Locale;
 
-/**
- * Reglas de comunicación entre clientes y servidor.
- *
- * Todos los mensajes son texto, con sus partes separadas por ";".
- * El primer campo siempre indica el tipo de mensaje.
- *
- * Cliente → Servidor
- *   OVERZONE_DISCOVER                      (broadcast) ¿hay algún servidor?
- *   CONNECT;nombre;version                 quiero unirme
- *   INPUT;seq;moverX;moverY;apuntarX;apuntarY;fire;contadorHabilidad
- *   PING;listo;personaje;nPedidoModo;modo;marcaDeTiempo  sigo conectado (cada 250 ms)
- *   DISCONNECT                             me voy
- *
- * Servidor → Cliente
- *   OVERZONE_SERVER;nombre;jugadores;max;version   respuesta al broadcast
- *   WELCOME;idJugador                      conexión aceptada
- *   REJECT;motivo                          conexión rechazada (FULL / UNKNOWN / VERSION)
- *   STATE;...                              estado completo de la partida
- *   PONG;marcaDeTiempo                     respuesta al PING (mide el retardo)
- *   SHUTDOWN                               el servidor se está cerrando
- */
 public final class Protocolo {
-
-    /**
-     * Versión del protocolo. Cliente y servidor están en repositorios
-     * distintos: si uno se actualiza y el otro no, esta versión no coincide
-     * y la conexión se rechaza con un aviso claro.
-     */
     public static final int VERSION = 5;
 
     public static final int PUERTO_SERVIDOR = 5555;
@@ -91,11 +56,6 @@ public final class Protocolo {
         return sb.toString();
     }
 
-    /**
-     * Convierte un número con decimales en texto, SIEMPRE con punto decimal.
-     * Con la configuración regional de Argentina, String.format escribiría
-     * "12,5" y la coma rompería el mensaje, que usa comas como separador.
-     */
     public static String f(float valor) {
         return String.format(Locale.ROOT, "%.1f", valor);
     }

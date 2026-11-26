@@ -4,6 +4,13 @@ Todos los cambios importantes realizados en el **servidor de OverZone** serán d
 
 El formato utilizado está basado en el estándar **Keep a Changelog**, organizando las modificaciones desde las más recientes hasta las más antiguas.
 
+## [0.8.1] - 2026-11-26
+
+### Cambiado
+
+* Se borraron todos los comentarios de más de 3 renglones del código. Quedan los comentarios cortos, de 1 a 3 renglones.
+* El juego no cambia: el programa compilado es idéntico al de la versión 0.8.0. El protocolo sigue en la versión 5, así que no hace falta actualizar los dos repos a la vez.
+
 ## [0.8.0] - 2026-11-25
 
 Código en español. **Cambia el protocolo (versión 5): hay que actualizar los dos repositorios.**

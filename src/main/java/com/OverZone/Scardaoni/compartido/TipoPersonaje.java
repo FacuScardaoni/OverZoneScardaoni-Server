@@ -1,28 +1,6 @@
-/*
- * ARCHIVO COMPARTIDO entre los dos repositorios:
- *   - OverZoneScardaoni         (cliente)
- *   - OverZoneScardaoni-Server  (servidor)
- * Tiene que ser IDÉNTICO en los dos. Si lo cambiás en uno, copialo al otro.
- * Si cambia el formato de algún mensaje, subí también Protocolo.VERSION, así
- * un cliente y un servidor de versiones distintas se avisan en lugar de fallar.
- */
 package com.OverZone.Scardaoni.compartido;
 
-/**
- * Personajes jugables y sus estadísticas, tomados de la propuesta del juego.
- *
- * Cada personaje es una constante del enum con sus propios valores. El
- * servidor los usa para aplicar las reglas (vida, velocidad, daño...) y el
- * cliente para mostrarlos en la sala de espera y dibujar el HUD.
- *
- *            Facción           Rol      Vida  Vel.  Daño  Alcance  Habilidad (recarga)
- *   Volt     CyberCore         Asalto    100   140    25    medio   Impulso Over (10 s)
- *   Brutus   Titan Force       Tanque    180   100    40    medio   Escudo Cinético (15 s)
- *   Iris     Aegis Protocol    Soporte   110   125    15    medio   Campo de Regeneración (20 s)
- *   Phantom  Shadow Syndicate  Asesino    90   170    38    corto   Camuflaje Óptico (18 s)
- */
 public enum TipoPersonaje {
-
     VOLT("Volt", "CyberCore", "Asalto",
         100f, 140f, 0.22f, 25f, 340f, 6f, 330f,
         "Impulso Over", "Aceleración instantánea", 10f, 0.18f),
@@ -48,11 +26,6 @@ public enum TipoPersonaje {
     /** Vida por segundo que recuperan los aliados dentro del campo. */
     public static final float REGENERACION_POR_SEGUNDO = 14f;
 
-    /**
-     * Qué tan "de frente" tiene que venir un disparo para que el escudo lo
-     * frene. Se compara con el coseno del ángulo: 0,4 equivale a un cono de
-     * unos 66 grados hacia cada lado de donde apunta Brutus.
-     */
     public static final float COS_FRENTE_ESCUDO = 0.4f;
 
     public final String nombreVisible;

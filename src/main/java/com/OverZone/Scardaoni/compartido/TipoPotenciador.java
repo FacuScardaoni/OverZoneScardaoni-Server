@@ -1,29 +1,6 @@
-/*
- * ARCHIVO COMPARTIDO entre los dos repositorios:
- *   - OverZoneScardaoni         (cliente)
- *   - OverZoneScardaoni-Server  (servidor)
- * Tiene que ser IDÉNTICO en los dos. Si lo cambiás en uno, copialo al otro.
- * Si cambia el formato de algún mensaje, subí también Protocolo.VERSION, así
- * un cliente y un servidor de versiones distintas se avisan en lugar de fallar.
- */
 package com.OverZone.Scardaoni.compartido;
 
-/**
- * Power-Ups temporales que aparecen en el mapa durante la partida.
- *
- * El SERVIDOR decide cuándo y dónde aparecen, detecta quién los agarra y
- * aplica el efecto. Los clientes solo los dibujan (y muestran en el HUD
- * cuánto le queda a cada efecto).
- *
- *   Botiquín    recupera 50 de vida al instante (solo si te falta vida)
- *   Turbo       35 % más de velocidad durante 6 s
- *   Sobrecarga  50 % más de daño por disparo durante 6 s
- *   Blindaje    recibís la mitad del daño durante 6 s
- *
- * Si agarrás uno que ya tenés activo, se reinicia su tiempo (no se suma).
- */
 public enum TipoPotenciador {
-
     BOTIQUIN("Botiquín", "+50 de vida", 0f),
     TURBO("Turbo", "+35% velocidad", 6f),
     SOBRECARGA("Sobrecarga", "+50% daño", 6f),

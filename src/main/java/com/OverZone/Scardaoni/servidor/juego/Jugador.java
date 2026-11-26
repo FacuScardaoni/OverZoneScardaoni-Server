@@ -6,20 +6,7 @@ import com.OverZone.Scardaoni.compartido.Direccion;
 import com.OverZone.Scardaoni.compartido.ConstantesJuego;
 import com.badlogic.gdx.math.Rectangle;
 
-/**
- * Jugador de la partida. Solo existe en el SERVIDOR.
- *
- * Guarda el estado real del jugador y aplica sus reglas: daño, muerte,
- * reaparición y la habilidad de su personaje. Las estadísticas (vida,
- * velocidad, daño, habilidad) salen de su TipoPersonaje, así el mismo código
- * sirve para los cuatro personajes:
- *   - Volt:    Impulso Over (sale disparado hacia donde camina).
- *   - Brutus:  Escudo Cinético (frena el 70 % del daño que viene de frente).
- *   - Iris:    Campo de Regeneración (la zona la crea y la maneja SimulacionPartida).
- *   - Phantom: Camuflaje Óptico (casi invisible; se corta si dispara).
- */
 public class Jugador {
-
     public static final float TAMANIO = ConstantesJuego.TAMANIO_JUGADOR;
 
     public static final float MULTIPLICADOR_IMPULSO = 3.2f;
@@ -88,10 +75,6 @@ public class Jugador {
     // Power-Ups
     // ------------------------------------------------------------------
 
-    /**
-     * ¿Le sirve este Power-Up? El Botiquín solo se agarra si falta vida, así
-     * no se desperdicia pasando por arriba con la vida llena.
-     */
     public boolean puedeRecoger(TipoPotenciador tipo) {
         if (!vivo) return false;
         return tipo != TipoPotenciador.BOTIQUIN || vida < personaje.vidaMaxima;
@@ -125,10 +108,6 @@ public class Jugador {
     // Habilidades
     // ------------------------------------------------------------------
 
-    /**
-     * Intenta usar la habilidad del personaje en la dirección indicada.
-     * Devuelve true si se activó (no estaba recargando).
-     */
     public boolean intentarUsarHabilidad(float dirX, float dirY) {
         if (!vivo || recargaHabilidadRestante > 0f || habilidadEstaActiva()) return false;
         float largo = (float) Math.sqrt(dirX * dirX + dirY * dirY);
@@ -205,11 +184,6 @@ public class Jugador {
     // Daño
     // ------------------------------------------------------------------
 
-    /**
-     * Aplica daño de un proyectil que viaja en la dirección (proyectilDirX, proyectilDirY).
-     * Si Brutus tiene el escudo activo y el disparo viene de frente, el escudo
-     * absorbe parte del daño. Devuelve true si este golpe eliminó al jugador.
-     */
     public boolean recibirDanio(float cantidadVida, float proyectilDirX, float proyectilDirY) {
         if (!vivo || invulnerabilidadRestante > 0) return false;
 

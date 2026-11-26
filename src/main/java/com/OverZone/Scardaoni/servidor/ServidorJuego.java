@@ -27,20 +27,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-/**
- * Servidor autoritativo de OverZone.
- *
- * Usa dos hilos:
- *  - Hilo de RECEPCIÓN: espera paquetes UDP y los deja en una cola.
- *  - Hilo del BUCLE DE JUEGO: 60 veces por segundo saca los mensajes de la
- *    cola, los procesa, avanza la partida y, 30 veces por segundo, envía el
- *    estado a todos los clientes.
- *
- * Solo el hilo del bucle toca la partida (SimulacionPartida), así nunca hay
- * dos hilos modificándola al mismo tiempo.
- */
 public class ServidorJuego {
-
     /** Un paquete recibido, guardado para procesarlo en el bucle de juego. */
     private static class MensajeEntrante {
         final String texto;
@@ -157,11 +144,6 @@ public class ServidorJuego {
         System.out.println("Servidor cerrado.");
     }
 
-    /**
-     * Lee comandos escritos en la consola. Termina cuando se escribe "salir".
-     * Si no hay consola (la entrada se cerró), el servidor sigue funcionando
-     * hasta que se cierre con Ctrl+C.
-     */
     public void correrConsola() {
         BufferedReader consola = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
         boolean salidaPedida = false;

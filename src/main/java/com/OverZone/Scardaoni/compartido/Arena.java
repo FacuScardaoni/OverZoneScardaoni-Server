@@ -1,11 +1,3 @@
-/*
- * ARCHIVO COMPARTIDO entre los dos repositorios:
- *   - OverZoneScardaoni         (cliente)
- *   - OverZoneScardaoni-Server  (servidor)
- * Tiene que ser IDÉNTICO en los dos. Si lo cambiás en uno, copialo al otro.
- * Si cambia el formato de algún mensaje, subí también Protocolo.VERSION, así
- * un cliente y un servidor de versiones distintas se avisan en lugar de fallar.
- */
 package com.OverZone.Scardaoni.compartido;
 
 import com.badlogic.gdx.math.Rectangle;
@@ -15,7 +7,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Arena {
-
     public static final float ANCHO = 960f;
     public static final float ALTO = 540f;
     public static final float GROSOR_PARED = 20f;
@@ -27,12 +18,10 @@ public class Arena {
     }
 
     private void armarMapa() {
-
         obstaculos.add(new Obstaculo(0, 0, ANCHO, GROSOR_PARED));                          // abajo
         obstaculos.add(new Obstaculo(0, ALTO - GROSOR_PARED, ANCHO, GROSOR_PARED));    // arriba
         obstaculos.add(new Obstaculo(0, 0, GROSOR_PARED, ALTO));                         // izquierda
         obstaculos.add(new Obstaculo(ANCHO - GROSOR_PARED, 0, GROSOR_PARED, ALTO));    // derecha
-
 
         float anchoBloque = 48, altoBloque = 48;
         obstaculos.add(new Obstaculo(200, 150, anchoBloque, altoBloque));
@@ -50,14 +39,6 @@ public class Arena {
         return buscarAparicionLibreCerca(ANCHO / 2f, ALTO / 2f, tamanioEntidad);
     }
 
-    /**
-     * Busca el lugar libre de obstáculos más cercano al punto indicado,
-     * recorriendo círculos cada vez más grandes alrededor de él.
-     */
-    /**
-     * Lugares donde pueden aparecer los Power-Ups (centros, sin obstáculos).
-     * Están en zonas disputadas, entre las bases, para que haya que arriesgarse.
-     */
     public static final float[][] APARICIONES_POTENCIADORES = {
         {ANCHO / 2f, ALTO / 2f},   // centro
         {224f, ALTO / 2f},         // pasillo izquierdo

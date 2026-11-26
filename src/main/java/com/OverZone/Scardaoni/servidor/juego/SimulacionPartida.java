@@ -19,27 +19,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
-/**
- * La partida real. Solo existe en el SERVIDOR.
- *
- * Contiene la lógica que antes estaba en PantallaJuego (movimiento con
- * colisiones, habilidades, disparos, daño), aplicada a hasta 4 jugadores,
- * con eliminaciones, reapariciones, etapas de partida y dos modos de juego:
- *
- *   - Todos contra todos: cada uno juega solo. El campo "team" de cada
- *     jugador es su color (0 a 3). Gana el que tenga más eliminaciones.
- *   - Equipos 2v2: azul contra rojo. Solo con exactamente 4 jugadores.
- *
- * El modo lo elige el anfitrión (el primero de la lista de jugadores). El
- * servidor decide si el pedido es válido: con menos de 4 jugadores no deja
- * elegir Equipos.
- *
- * No sabe nada de la red ni de la pantalla: recibe entradas (aplicarEntrada),
- * avanza en el tiempo (update) y entrega una foto del estado (crearEstado).
- * Por eso la usa un solo hilo, el del bucle del servidor.
- */
 public class SimulacionPartida {
-
     public static final float DURACION_PARTIDA = 120f;
     public static final float DURACION_CUENTA_REGRESIVA = 3f;
     public static final float DURACION_RESULTADOS = 8f;
@@ -177,10 +157,6 @@ public class SimulacionPartida {
         if (lugar != null) lugar.listo = listo;
     }
 
-    /**
-     * Cambia el personaje de un jugador. Solo se permite en la sala de
-     * espera: durante la partida, el pedido se ignora.
-     */
     public void setPersonaje(int jugadorId, TipoPersonaje personaje) {
         if (fase != FasePartida.SALA && fase != FasePartida.CUENTA_REGRESIVA) return;
         Lugar lugar = buscarLugar(jugadorId);
@@ -200,18 +176,6 @@ public class SimulacionPartida {
         PARTIDA_EMPEZADA
     }
 
-    /**
-     * Pedido de cambio de modo. Cada pedido trae un número que el cliente
-     * sube cada vez que el jugador elige un modo (como el contador de la
-     * habilidad). El pedido viaja repetido en todos los PING: el servidor
-     * atiende cada número una sola vez, así una pérdida de paquetes no lo
-     * hace perder y una repetición no lo aplica dos veces.
-     *
-     * Se acepta solo si:
-     *   - viene del anfitrión,
-     *   - la partida no empezó (sala de espera o cuenta regresiva), y
-     *   - el modo se puede jugar con los jugadores que hay (Equipos: 4 exactos).
-     */
     public ResultadoPedidoModo pedirModo(int jugadorId, int numeroPedido, ModoJuego pedido) {
         Lugar lugar = buscarLugar(jugadorId);
         if (lugar == null || numeroPedido <= lugar.ultimoPedidoModo) return ResultadoPedidoModo.REPETIDO;
@@ -487,10 +451,6 @@ public class SimulacionPartida {
         }
     }
 
-    /**
-     * Power-Ups: cada tanto aparece uno nuevo, de un tipo al azar, en un punto
-     * libre del mapa; y el primer jugador vivo que lo toque se lo lleva.
-     */
     private void actualizarPotenciadores(float delta) {
         tiempoPotenciador -= delta;
         if (tiempoPotenciador <= 0f) {
@@ -593,11 +553,6 @@ public class SimulacionPartida {
         return true; // Todos contra todos: cualquiera que no sea uno mismo
     }
 
-    /**
-     * Reparte equipos según el modo y ubica a cada uno en su lugar de aparición.
-     *   - Equipos: alternado por orden de llegada (azul, rojo, azul, rojo).
-     *   - Todos contra todos: cada uno recibe su propio color (0, 1, 2, 3).
-     */
     private void asignarEquipos() {
         int indiceAzul = 0, indiceRojo = 0;
         for (int i = 0; i < lugares.size(); i++) {
@@ -634,12 +589,6 @@ public class SimulacionPartida {
         return arena.buscarAparicionLibreCerca(posicion[0], posicion[1], Jugador.TAMANIO);
     }
 
-    /**
-     * Dónde reaparece alguien eliminado.
-     *   - Equipos: en la base de su equipo.
-     *   - Todos contra todos: en la esquina más alejada de los rivales vivos,
-     *     para no reaparecer al lado de quien lo acaba de eliminar.
-     */
     private Vector2 puntoReaparicionPara(Jugador p) {
         if (modo == ModoJuego.EQUIPOS) return puntoAparicionPara(p.getEquipo(), 0);
         float mejorDistanciaAparicion = -1f;

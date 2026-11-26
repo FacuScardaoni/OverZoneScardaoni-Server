@@ -1,38 +1,10 @@
-/*
- * ARCHIVO COMPARTIDO entre los dos repositorios:
- *   - OverZoneScardaoni         (cliente)
- *   - OverZoneScardaoni-Server  (servidor)
- * Tiene que ser IDÉNTICO en los dos. Si lo cambiás en uno, copialo al otro.
- * Si cambia el formato de algún mensaje, subí también Protocolo.VERSION, así
- * un cliente y un servidor de versiones distintas se avisan en lugar de fallar.
- */
 package com.OverZone.Scardaoni.compartido;
-
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * "Foto" completa de la partida en un instante, armada por el servidor.
- *
- * El servidor envía una de estas unas 30 veces por segundo. Cada foto trae
- * TODO el estado (no solo lo que cambió): si una se pierde en la red, la
- * siguiente la reemplaza por completo y el cliente se pone al día solo.
- *
- * Formato del mensaje:
- *   STATE;seq;fase;tiempo;puntosAzul;puntosRojo;ganador;motivoFin;modo;anfitrion;JUGADORES;PROYECTILES;ZONAS;POWERUPS
- * donde JUGADORES, PROYECTILES, ZONAS y POWERUPS son listas separadas por "|" con sus
- * campos separados por ",". Una lista vacía se escribe "-".
- *
- * El campo "team" de cada jugador depende del modo: en Equipos es el equipo
- * (0 azul, 1 rojo); en Todos contra todos es un color propio (0 a 3).
- *
- * Los objetos de esta clase no cambian después de creados: así el hilo de red
- * puede armarlos y el hilo de dibujo leerlos sin pisarse.
- */
 public class EstadoMundo {
-
     /** Datos de un jugador, tal como los ven los clientes. */
     public static class EstadoJugador {
         public final int id;
@@ -55,11 +27,6 @@ public class EstadoMundo {
         /** 0 = habilidad lista, 1 = recién usada. */
         public final float recargaHabilidad;
         public final float reapareceEn;
-        /**
-         * Segundos que le quedan a cada Power-Up temporal, en el orden de
-         * TipoPotenciador (el Botiquín es instantáneo y siempre vale 0).
-         * Viajan en un solo campo separados por ":" (ej.: "0:3.5:0:0").
-         */
         public final float[] potenciadores;
 
         public EstadoJugador(int id, String nombre, int equipo, int personaje, float x, float y, int mirando,
@@ -224,10 +191,6 @@ public class EstadoMundo {
     /** Según la fase: segundos de cuenta regresiva, de partida o de resultados. */
     public final float tiempoFase;
     public final int puntosAzul, puntosRojo;
-    /**
-     * Ganador. En Equipos: Equipo.AZUL o Equipo.ROJO. En Todos contra todos: el id
-     * del jugador ganador. En los dos: -1 si hubo empate o no terminó.
-     */
     public final int ganador;
     /** Por qué terminó la partida: TIME (tiempo agotado) o PLAYERS (se fueron jugadores). */
     public final String motivoFin;
